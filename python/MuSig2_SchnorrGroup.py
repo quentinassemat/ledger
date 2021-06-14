@@ -1,5 +1,6 @@
 #Importation des librairies
 
+#pour tester si notre Groupe est bien de Schnorr
 from sympy import isprime
 
 #On prend secrets car random n'est pas fiable pour la cryptographie
@@ -7,7 +8,6 @@ import secrets as sct
 
 #pour les fonctions de hash
 import hashlib as hl
-
 
 
 #Class Group qui contient un generateur (self.g), son ordre (self.p)...    
@@ -44,16 +44,11 @@ class Signer:
         self.p = G.order
         self.list_r = [0]*nb_nonces
     
-    def r(self):
-        return sct.randbelow(self.p - 1)
-    
     def gen_r(self):
         for i in range(len(self.list_r)):
             self.list_r[i] = sct.randbelow(G.order)
 
 #Déroulement de l'algo 
-
-#FONCTION DE HASH A REVOIR (j'ai fait la somme pour les listes et non pas une séquence predefinie)
 
 class SignScheme:
     def __init__(self, G,nb_participant, nb_nonces):
