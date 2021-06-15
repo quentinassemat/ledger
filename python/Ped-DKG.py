@@ -46,7 +46,8 @@ class PedKDG:
             self.coef[i] = sct.randbelow(p)
         # correspond aux shares qui seront stocké (les f_i(j) pour 1 <= i <= n)
         self.shares = [0] * n
-        self.complains = [False] * n  # correspond aux plaintes
+        # correspond aux plaintes (vrai si plainte contre i)
+        self.complains = [False] * n
 
     def poly(self, z):  # fonction poly aléatoire, calculé avec Horner
         res = self.coef[self.t-1]
@@ -99,10 +100,10 @@ class SignScheme:
                     temp = temp.complete_add_unsafe(
                         pow(j+1, k) * self.X1[i][k])
                 self.Signers[j].DKG1.complains[i] = (
-                    self.Signers[j].DKG1.shares[i] * G == temp)
+                    self.Signers[j].DKG1.shares[i] * G != temp)
         #on vient de remplir les tableaux de plaintes
 
-        #Étape 3 Ped-KG
+        #Étape 3 Ped-KG (on tourne un peu en rond comme on vérifie plusieurs fois la même chose)
         # counter_plaints[i] est le nombre de plaintes contre le Signer i
         counter_plaints = [0] * self.n
         for i in range(self.n):
@@ -110,10 +111,26 @@ class SignScheme:
                 if(self.Signers[i].DKG1.complains[j]):
                     counter_plaints[j] += 1
 
+        #En fonctions de plaintes on disqualifie ou non
         for i in range(self.n):
             if (counter_plaints[i] >= self.t):  # si trop de plaintes : disqualifié
                 self.Signers[i].key = 0
                 self.Signers[i].KEY = E
+            # si au moins une plainte on regarde les shares
+            elif (counter_plaints[i] > 0):
+                for j in range(self.n):
+                    # ici on calcule deux fois la même chose pour suivre à la lettre l'algo du papier
+                    if (self.Signers[j].DKG1.complains[i]):
+                        temp = E
+                        for k in range(self.t):
+                            temp = temp.complete_add_unsafe(
+                                pow(j+1, k) * self.X1[i][k])
+                        # si bel et bien équation pas correct on disqualifie
+                        if (self.Signers[j].DKG1.shares[i] * G != temp):
+                            self.Signers[i].key = 0
+                            self.Signers[i].KEY = E
+
+    #Étape 4 Ped-KG : ne sert pas à grand chose la
 
     def DKG(self):
         # correspond à la liste des Xik dans le papiers
