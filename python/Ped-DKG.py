@@ -13,6 +13,10 @@ from arithm.ecc.curves import secp256k1
 from arithm.ecc.ecc import Point
 from arithm.field import Field
 
+#pour la reconstruction des clés
+from scipy.interpolate import lagrange
+from fractions import Fraction
+
 #on travaille avec secp256K1 : voici quelques constantes :
 #G est le générateur de notre groupe
 G = secp256k1.G
@@ -56,7 +60,7 @@ class PedKDG:
         res = 0
         for i in range(self.t):
             res = res + pow(z, i)*self.coef[i]
-        return res % p
+        return res
 
     # def poly(self, z):  # Fausse fonction aléatoire pour coder les cas qui n'arrive pas normalement
     #     res = 0
@@ -235,14 +239,18 @@ class SignScheme:
             if ((self.Signers[i].KEY.is_at_infinity()) or (self.keyshare[i] * G != self.Signers[i].NONCE.complete_add_unsafe(c * self.Signers[i].KEY))):
                 trust_count[i] = 0
 
+        #ligne à commenter, décommenter pour tester le cas d'échec
+        # trust_count[0] = 0 #pour tester le cas d'échec
+        # trust_count[1] = 0
+
         #cas qui n'arrivera pas où pas assez de bonne signature
         if (sum(trust_count) < self.t):
             print(
                 f"Il n'y a seulement que {sum(trust_count)} bonne share alors que t = {self.t}. ")
             print("La signature échoue")
             return (G, 1)
-
-
+        
+        #Ligne à commenter/décommenter afin d'enlever la confiance en certain Signer pour forcé à reconstruire les clés afin de tester la reconstuction
         trust_count[0] = 0 #pour tester la reconstruction
 
         print(f"Ancienne signature : {self.keyshare[0]}")
@@ -261,47 +269,52 @@ class SignScheme:
         #reconstruction à partir d'une liste fiable des potentiels fausse signatures
         for i in range(self.n):
             if (trust_count[i] == 0):
+
+                print("\nUn des Signer n'est pas fiable (rajouté artificiellement), mais nous pouvons reconstuire sa clef")
+
                 #reconstruction de xi avec Lagrange à partir des shares stockées
                 print(f"Ancien xi : {self.Signers[i].key}")
-                coef = [1] * self.t
+
+                coef = [Fraction(1,1)] * self.t
                 for k in range(self.t):
-                    inv = 1
+                    inv = Fraction(1,1)
                     for j in L:
                         if (j != L[k]):
-                            coef[k] *= j
-                            inv *= (j - L[k])
-                    coef[k] *= pow(inv, -1, p) * \
-                        self.Signers[L[k]].DKG1.shares[i]
-                xi = 1
+                            coef[k] *= j + 1
+                            inv *= Fraction(1,(j - L[k]))
+                    coef[k] = coef[k] * inv
+                    coef[k] *= Fraction(self.Signers[L[k]].DKG1.shares[i],1)
+                xi = Fraction(0,1)
                 for k in range(self.t):
-                    xi *= coef[i]
+                    xi += coef[k]
 
-                self.Signers[i].key = xi % p
+                self.Signers[i].key = xi.numerator #censé être entier
                 print(f"Nouveau xi : {self.Signers[i].key}")
 
-                #reconstruction de ki avec Lagranfe à partir des shares stockées
-                print(f"Ancien ki : {self.Signers[i].nonce}")
-                coef = [1] * self.t
+                #reconstruction de ki avec Lagrange à partir des shares stockées
+                print(f"Ancien ki : {self.Signers[i].key}")
+
+                coef = [Fraction(1,1)] * self.t
                 for k in range(self.t):
-                    inv = 1
+                    inv = Fraction(1,1)
                     for j in L:
                         if (j != L[k]):
-                            coef[k] *= j
-                            inv *= (j - L[k])
-                    coef[k] *= pow(inv, -1, p) * \
-                        self.Signers[L[k]].DKG2.shares[i]
-                ki = 1
+                            coef[k] *= j + 1
+                            inv *= Fraction(1,(j - L[k]))
+                    coef[k] = coef[k] * inv
+                    coef[k] *= Fraction(self.Signers[L[k]].DKG2.shares[i],1)
+                ki = Fraction(0,1)
                 for k in range(self.t):
-                    ki *= coef[i]
+                    ki += coef[k]
 
-                self.Signers[i].nonce = ki % p
-                print(f"nouveau ki : {self.Signers[i].nonce}")
+                self.Signers[i].nonce = ki.numerator #censé être entier
+                print(f"Nouveau ki : {self.Signers[i].nonce}")
 
                 #reconstruction de la signature
                 self.keyshare[i] = self.Signers[i].nonce + \
                     c * self.Signers[i].key % p
                 
-                print(f"Nouvelle signature : {self.keyshare[i]}")
+                print(f"Nouvelle signature : {self.keyshare[i]}\n")
 
         s = sum(self.keyshare) % p
         return (self.PUBNONCE, s)
