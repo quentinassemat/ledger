@@ -14,7 +14,6 @@ from arithm.ecc.ecc import Point
 from arithm.field import Field
 
 #pour la reconstruction des clés
-from scipy.interpolate import lagrange
 from fractions import Fraction
 
 #on travaille avec secp256K1 : voici quelques constantes :
