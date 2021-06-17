@@ -1,6 +1,6 @@
-#Importation des librairies
+#LIGNE 242, 254 À COMMENTER/DÉCOMMENTER AFIN DE TESTER LA RECONSTRUCTION DES CLEFS
 
-from sympy import isprime
+#Importation des librairies
 
 #On prend secrets car random n'est pas fiable pour la cryptographie
 import secrets as sct
@@ -157,8 +157,6 @@ class SignScheme:
         for i in range(self.n):
             self.PUBKEY = self.PUBKEY.complete_add_unsafe(self.Signers[i].KEY)
 
-        #peut être rajouter le calcul de la clé publique à voir
-
     def NonceGen(self):
         # correspond à la liste des Xik dans le papier mais pour le premier DKG
         self.X2 = [[E]*self.t for l in range(self.n)]
@@ -217,8 +215,6 @@ class SignScheme:
         for i in range(self.n):
             self.PUBNONCE = self.PUBNONCE.complete_add_unsafe(
                 self.Signers[i].NONCE)
-
-        #peut être rajouter ici le calcul du nonce privé
 
     def Sign(self):
         #Inputs (papier)
@@ -340,7 +336,6 @@ nb_participant = 3
 threshold = 2
 
 #Déroulement de l'algo
-
 
 Signsch = SignScheme(nb_participant, threshold)
 R, s = Signsch.Sign()
