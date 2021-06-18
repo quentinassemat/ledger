@@ -18,10 +18,13 @@ from arithm.field import Field
 G = secp256k1.G
 
 #ordre du groupe
-p = secp256k1.order
+N = secp256k1.order
 
 #F est le corps de définition de la courbe
-F = Field(secp256k1.order)
+F = secp256k1.a.field
+
+#Fn est le corps des entiers modulo l'ordre
+Fn = Field(secp256k1.order)
 
 #nombre de bytes necessaire pour stocker en byte les entiers
 N_bytes = 32
@@ -44,7 +47,7 @@ class PedKDG:
         self.n = n
         self.coef = [0]*t  # de a_0 à a_{t-1}
         for i in range(t):
-            self.coef[i] = F(sct.randbelow(p))
+            self.coef[i] = Fn(sct.randbelow(N))
 
         # correspond aux shares qui seront stocké (les f_i(j) pour 1 <= i <= n)
         self.shares = [0] * n
@@ -53,9 +56,9 @@ class PedKDG:
         self.complains = [False] * n
 
     def poly(self, z):  # fonction poly aléatoire, optimisable avec Horner
-        res = F(0)
+        res = Fn(0)
         for i in range(self.t):
-            res = res + F(pow(z, i,p)) * self.coef[i]
+            res = res + Fn(pow(z, i, N)) * self.coef[i]
         return res
 
 class Signer:
@@ -64,14 +67,14 @@ class Signer:
         self.index = index
 
         #on génère clefs publiques/privés mais elles seront redéfini lors de la signature Threshold
-        self.key = F(sct.randbelow(p - 1) + 1)
+        self.key = Fn(sct.randbelow(N - 1) + 1)
         self.KEY = self.key * G
 
         self.DKG1 = PedKDG(t, n, index)  # pour les clés privés
         self.DKG2 = PedKDG(t, n, index)  # pour les nombres aléatoires
 
         #on génère nonces publiques/privés mais elles seront redéfini lors de la signature Threshold
-        self.nonce = F(sct.randbelow(p - 1) + 1)
+        self.nonce = Fn(sct.randbelow(N - 1) + 1)
         self.NONCE = self.nonce * G
 
 
@@ -122,7 +125,7 @@ class SignScheme:
         #En fonctions de plaintes on disqualifie ou non
         for i in range(self.n):
             if (counter_plaints[i] >= self.t):  # si trop de plaintes : disqualifié
-                self.Signers[i].key = F(0)
+                self.Signers[i].key = Fn(0)
                 self.Signers[i].KEY = E
             # si au moins une plainte on regarde les shares
             elif (counter_plaints[i] > 0):
@@ -137,7 +140,7 @@ class SignScheme:
                         if (self.Signers[j].DKG1.shares[i].val * G != temp):
                             print(
                                 'Il y a trop de plainte, ce signeur est disqualifié (2)')
-                            self.Signers[i].key = F(0)
+                            self.Signers[i].key = Fn(0)
                             self.Signers[i].KEY = E
 
         #Étape 4 Ped-KG :
@@ -182,7 +185,7 @@ class SignScheme:
         #En fonctions de plaintes on disqualifie ou non
         for i in range(self.n):
             if (counter_plaints[i] >= self.t):  # si trop de plaintes : disqualifié
-                self.Signers[i].nonce = F(0)
+                self.Signers[i].nonce = Fn(0)
                 self.Signers[i].NONCE = E
             # si au moins une plainte on regarde les shares
             elif (counter_plaints[i] > 0):
@@ -195,7 +198,7 @@ class SignScheme:
                                 pow(j+1, k) * self.X2[i][k])
                         # si bel et bien équation pas correct on disqualifie
                         if (self.Signers[j].DKG2.shares[i].val * G != temp):
-                            self.Signers[i].nonce = F(0)
+                            self.Signers[i].nonce = Fn(0)
                             self.Signers[i].NONCE = E
 
         #Étape 4 Ped-KG :
@@ -212,7 +215,7 @@ class SignScheme:
 
         #Étape 2
         c = int.from_bytes(hl.sha256(b''.join([bytearray(
-            M, 'utf-16'), self.PUBNONCE.x.val.to_bytes(N_bytes, 'big')])).digest(), 'big') % p
+            M, 'utf-16'), self.PUBNONCE.x.val.to_bytes(N_bytes, 'big')])).digest(), 'big') % N
 
         #Étape 3
         # pour compter combien de Signer ont envoyé la bonne share. Cela permettra de reconstruire la share des personnes ayant tricher. 1 correspond à bonne signature.
@@ -220,7 +223,7 @@ class SignScheme:
         self.keyshare = [F(0)] * self.n
         for i in range(self.n):
             self.keyshare[i] = self.Signers[i].nonce + \
-                F(c) * self.Signers[i].key 
+                Fn(c) * self.Signers[i].key 
             print(self.Signers[i].key .val)
             if ((self.Signers[i].KEY.is_at_infinity()) or (self.keyshare[i].val * G != self.Signers[i].NONCE.complete_add_unsafe(c * self.Signers[i].KEY))):
                 trust_count[i] = 0
@@ -262,16 +265,16 @@ class SignScheme:
                 #reconstruction de xi avec Lagrange à partir des shares stockées
                 print(f"Ancien xi : {self.Signers[i].key.val}")
 
-                coef = [F(1)] * self.t
+                coef = [Fn(1)] * self.t
                 for k in range(self.t):
-                    inv = F(1)
+                    inv = Fn(1)
                     for j in L:
                         if (j != L[k]):
                             coef[k] *= j + 1
-                            inv *= pow(F(j - L[k]),-1)
+                            inv *= pow(Fn(j - L[k]),-1)
                     coef[k] = coef[k] * inv
                     coef[k] *= self.Signers[L[k]].DKG1.shares[i]
-                xi = F(0)
+                xi = Fn(0)
                 for k in range(self.t):
                     xi += coef[k]
 
@@ -281,16 +284,16 @@ class SignScheme:
                 #reconstruction de ki avec Lagrange à partir des shares stockées
                 print(f"Ancien ki : {self.Signers[i].key.val}")
 
-                coef = [F(1)] * self.t
+                coef = [Fn(1)] * self.t
                 for k in range(self.t):
-                    inv = F(1)
+                    inv = Fn(1)
                     for j in L:
                         if (j != L[k]):
                             coef[k] *= j + 1
-                            inv *= pow(F(j - L[k]),-1)
+                            inv *= pow(Fn(j - L[k]),-1)
                     coef[k] = coef[k] * inv
                     coef[k] *= self.Signers[L[k]].DKG2.shares[i]
-                ki = F(0)
+                ki = Fn(0)
                 for k in range(self.t):
                     ki += coef[k]
 
@@ -299,25 +302,25 @@ class SignScheme:
 
                 #reconstruction de la signature
                 self.keyshare[i] = self.Signers[i].nonce + \
-                    F(c) * self.Signers[i].key
+                    Fn(c) * self.Signers[i].key
 
                 print(f"Nouvelle signature : {self.keyshare[i].val}\n")
 
-        s = F(0)
+        s = Fn(0)
         for i in range(self.n):
             s += self.keyshare[i]
         return (self.PUBNONCE, s.val)
 
     def verif(self, R, s):
         c = int.from_bytes(hl.sha256(b''.join(
-            [bytearray(M, 'utf-16'), R.x.val.to_bytes(N_bytes, 'big')])).digest(), 'big') % p
+            [bytearray(M, 'utf-16'), R.x.val.to_bytes(N_bytes, 'big')])).digest(), 'big') % N
         if (self.PUBKEY.is_at_infinity()):
             return False
         return (s * G == R.complete_add_unsafe(c * self.PUBKEY))
 
 
 def FakeKey(G):
-    return (sct.randbelow(p) * G, sct.randbelow(p))
+    return (sct.randbelow(N) * G, sct.randbelow(N))
 
 
 #paramètre pour signer :
