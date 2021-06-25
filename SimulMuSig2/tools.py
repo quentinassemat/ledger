@@ -11,7 +11,10 @@ import hashlib as hl
 #pour gérer les courbes elliptiques
 from arithm.ecc.curves import secp256k1
 from arithm.ecc.ecc import Point
-from arithm.field import Field
+from arithm.field import Field, FieldElement
+
+#pour la communication tcp
+import socket
 
 #on travaille avec secp256K1 : voici quelques constantes :
 #G est le générateur de notre groupe
@@ -32,8 +35,7 @@ E = Point(F(0), F(1), F(0), secp256k1)
 #Données de communication serveur 
 ADRESSE = 'localhost'
 PORT = 1234
-
-
+MEM = 1024 #mémoire nécessaire pour communiquer les infos durant les étapes de communications
 
 #Class signer à sa clef publique (self.KEY), sa clef prive (self.key), une fonction de generation aleatoire
 class Signer:
@@ -47,21 +49,39 @@ class Signer:
         for i in range(len(self.list_r)):
             self.list_r[i] = sct.randbelow(n)
 
+def str_to_point(str_point):
+    temp = str_point[1:len(str_point)-1]
+    list_temp = temp.split(" : ")
+    return Point(FieldElement(int(list_temp[0],16),F),FieldElement(int(list_temp[1],16),F) , FieldElement(int(list_temp[2],16),F), secp256k1)
+
+def bytesrep_to_messagePoint(bytes):
+    str_rep = bytes.decode()
+    str_list = str_rep.split(']')
+    str_id = str_list[0][5:]
+    str_point = str_list[1]
+    return messagePoint(str_to_point(str_id),str_to_point(str_point))
+
+#class pour wrapper l'envoie de message en ayant l'inforation de où vient le message
+class messagePoint:
+    def __init__(self, _id, _point):
+        self.point = _point
+        self.id = _id
+
+    def __bytes__(self):
+        return b''.join(["[ID :".encode('utf-8') ,repr(self.id).encode('utf-8'),"]".encode('utf-8') , repr(self.point).encode('utf-8')])
 
 #Déroulement de l'algo
 class SignScheme:
     def __init__(self, nb_participant, nb_nonces):
         self.nb_participant = nb_participant
         self.nb_nonces = nb_nonces
-        self.Signers = [Signer(nb_nonces)
-                        for i in range(nb_participant)]  # (Alice, Bob)
+        self.SignersPUBKEY = [E]  # (Alice, Bob)
+
 
     def Sign(self):
         nb_participant = self.nb_participant
         nb_nonces = self.nb_nonces
 
-        #Les Signeurs ont chacun une clef privée, une clef publique a ce moment
-        L = [self.Signers[i].KEY for i in range(nb_participant)]
         # R[i][j] is Rij. Rij est (Rij.x, Rij.y) (attention deux coordonnées)
         R = [[E]*nb_nonces for i in range(nb_participant)]
 
