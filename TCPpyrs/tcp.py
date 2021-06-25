@@ -15,10 +15,13 @@ while True:
             print("Erreur de reception")
         else:
             print(f"[{adresseClient}] : {donnees.decode()}")
-            if (donnees.decode() == "quit"):
+            if ((donnees.decode() == "shutdown\n") or (donnees.decode() == "shutdown\r\n")):
+                client.close()
                 break
             n = client.sendall(donnees)
+            client.close()
     finally:
         client.close()
+
 
 serveur.close()
