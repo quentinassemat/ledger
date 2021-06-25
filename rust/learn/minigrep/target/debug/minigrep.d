@@ -1,0 +1,1 @@
+/Users/qassemat/Documents/GitHub/ledger/rust/learn/minigrep/target/debug/minigrep: /Users/qassemat/Documents/GitHub/ledger/rust/learn/minigrep/src/lib.rs /Users/qassemat/Documents/GitHub/ledger/rust/learn/minigrep/src/main.rs

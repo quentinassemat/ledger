@@ -1,0 +1,11 @@
+/Users/qassemat/Documents/GitHub/ledger/rust/learn/guessing_game/target/debug/deps/getrandom-418490928d325a60.rmeta: /Users/qassemat/.cargo/registry/src/github.com-1ecc6299db9ec823/getrandom-0.2.3/src/lib.rs /Users/qassemat/.cargo/registry/src/github.com-1ecc6299db9ec823/getrandom-0.2.3/src/error.rs /Users/qassemat/.cargo/registry/src/github.com-1ecc6299db9ec823/getrandom-0.2.3/src/util.rs /Users/qassemat/.cargo/registry/src/github.com-1ecc6299db9ec823/getrandom-0.2.3/src/error_impls.rs /Users/qassemat/.cargo/registry/src/github.com-1ecc6299db9ec823/getrandom-0.2.3/src/util_libc.rs /Users/qassemat/.cargo/registry/src/github.com-1ecc6299db9ec823/getrandom-0.2.3/src/use_file.rs /Users/qassemat/.cargo/registry/src/github.com-1ecc6299db9ec823/getrandom-0.2.3/src/macos.rs
+
+/Users/qassemat/Documents/GitHub/ledger/rust/learn/guessing_game/target/debug/deps/getrandom-418490928d325a60.d: /Users/qassemat/.cargo/registry/src/github.com-1ecc6299db9ec823/getrandom-0.2.3/src/lib.rs /Users/qassemat/.cargo/registry/src/github.com-1ecc6299db9ec823/getrandom-0.2.3/src/error.rs /Users/qassemat/.cargo/registry/src/github.com-1ecc6299db9ec823/getrandom-0.2.3/src/util.rs /Users/qassemat/.cargo/registry/src/github.com-1ecc6299db9ec823/getrandom-0.2.3/src/error_impls.rs /Users/qassemat/.cargo/registry/src/github.com-1ecc6299db9ec823/getrandom-0.2.3/src/util_libc.rs /Users/qassemat/.cargo/registry/src/github.com-1ecc6299db9ec823/getrandom-0.2.3/src/use_file.rs /Users/qassemat/.cargo/registry/src/github.com-1ecc6299db9ec823/getrandom-0.2.3/src/macos.rs
+
+/Users/qassemat/.cargo/registry/src/github.com-1ecc6299db9ec823/getrandom-0.2.3/src/lib.rs:
+/Users/qassemat/.cargo/registry/src/github.com-1ecc6299db9ec823/getrandom-0.2.3/src/error.rs:
+/Users/qassemat/.cargo/registry/src/github.com-1ecc6299db9ec823/getrandom-0.2.3/src/util.rs:
+/Users/qassemat/.cargo/registry/src/github.com-1ecc6299db9ec823/getrandom-0.2.3/src/error_impls.rs:
+/Users/qassemat/.cargo/registry/src/github.com-1ecc6299db9ec823/getrandom-0.2.3/src/util_libc.rs:
+/Users/qassemat/.cargo/registry/src/github.com-1ecc6299db9ec823/getrandom-0.2.3/src/use_file.rs:
+/Users/qassemat/.cargo/registry/src/github.com-1ecc6299db9ec823/getrandom-0.2.3/src/macos.rs:
