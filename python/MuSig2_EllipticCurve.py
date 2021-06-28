@@ -67,6 +67,7 @@ class SignScheme:
             self.Signers[i].gen_r()
             for j in range(nb_nonces):
                 R[i][j] = (self.Signers[i].list_r[j]) * G  # partage des R.
+                print(R[i][j])
 
         #Second Signing step (Sign' and communication round)
 

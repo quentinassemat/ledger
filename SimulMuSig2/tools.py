@@ -35,7 +35,13 @@ E = Point(F(0), F(1), F(0), secp256k1)
 #Données de communication serveur 
 ADRESSE = 'localhost'
 PORT = 1234
-MEM = 1024 #mémoire nécessaire pour communiquer les infos durant les étapes de communications
+MEM = 4096 #mémoire nécessaire pour communiquer les infos durant les étapes de communications
+
+#Paramètres pour la signature
+nb_participant = 6
+nb_corromp = 0
+nb_nonces = 3
+M = "Alice donne 1 Bitcoin à Bob"
 
 #Class signer à sa clef publique (self.KEY), sa clef prive (self.key), une fonction de generation aleatoire
 class Signer:
@@ -60,6 +66,49 @@ def bytesrep_to_messagePoint(bytes):
     str_id = str_list[0][5:]
     str_point = str_list[1]
     return messagePoint(str_to_point(str_id),str_to_point(str_point))
+
+def matPoint_to_bytes(R): #pour envoyer matrice de point 
+    n = len(R) #censé être nb_participant
+    m = len(R[0]) #censé être nb_nonces
+    L = []
+    for i in range(n-1):
+        for j in range(m - 1):
+            L.append(repr(R[i][j]).encode())
+            L.append(b';')
+        L.append(repr(R[i][m-1]).encode())
+        L.append(b'\n')
+    for j in range(m- 1):
+        L.append(repr(R[n-1][j]).encode())
+        L.append(b';')
+    L.append(repr(R[n-1][m-1]).encode())
+    return b''.join(L)
+
+def bytes_to_matPoint(bytes):
+    R = [[E]*nb_nonces for i in range(nb_participant)]
+    s = bytes.decode()
+    list1 = s.split('\n')
+    for i in range(nb_participant):
+        L = list1[i].split(';')
+        for j in range(nb_nonces):
+            R[i][j] = str_to_point(L[j])
+    return R
+        
+def listPoint_to_bytes(L):
+    n = len(L)
+    res = []
+    for i in range(n-1):
+        res.append(repr(L[i]).encode())
+        res.append(b';')
+    res.append(repr(L[n-1]).encode())
+    return b''.join(res)
+
+def bytes_to_list(bytes): #pour communiquer la liste des clefs publiques (même si censé déjà les avoir)
+    L = [E] * nb_participant
+    s = bytes.decode()
+    temp = s.split(';')
+    for i in range(nb_participant):
+        L[i] = str_to_point(temp[i])
+    return L
 
 #class pour wrapper l'envoie de message en ayant l'inforation de où vient le message
 class messagePoint:
@@ -145,10 +194,4 @@ class SignScheme:
 def FakeKey(G):
     return (sct.randbelow(n) * G, sct.randbelow(n))
 
-
-#Paramètres pour la signature
-nb_participant = 4
-nb_corromp = 0
-nb_nonces = 3
-M = "Alice donne 1 Bitcoin à Bob"
 
