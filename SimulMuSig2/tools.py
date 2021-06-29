@@ -102,15 +102,35 @@ def listPoint_to_bytes(L):
     res.append(repr(L[n-1]).encode())
     return b''.join(res)
 
+def listint_to_bytes(L):
+    n = len(L)
+    res = []
+    for i in range(n-1):
+        res.append(hex(L[i]).encode())
+        res.append(b';')
+    res.append(hex(L[n-1]).encode())
+    return b''.join(res)
+
 def bytes_to_list(bytes): #pour communiquer la liste des clefs publiques (même si censé déjà les avoir)
     L = [E] * nb_participant
     s = bytes.decode()
     temp = s.split(';')
+    assert len(temp) == nb_participant
     for i in range(nb_participant):
         L[i] = str_to_point(temp[i])
     return L
 
-#class pour wrapper l'envoie de message en ayant l'inforation de où vient le message
+def bytes_to_listint(bytes):
+    L = [0] * nb_participant
+    s = bytes.decode()
+    temp = s.split(';')
+    assert len(temp) == nb_participant
+    for i in range(nb_participant):
+        L[i] = int(temp[i],16)
+    return L
+
+
+#class pour wrapper l'envoie de message en ayant l'information de où vient le message
 class messagePoint:
     def __init__(self, _id, _point):
         self.point = _point
@@ -118,6 +138,23 @@ class messagePoint:
 
     def __bytes__(self):
         return b''.join(["[ID :".encode('utf-8') ,repr(self.id).encode('utf-8'),"]".encode('utf-8') , repr(self.point).encode('utf-8')])
+
+def bytesrep_to_messageSign(bytes):
+    str_rep = bytes.decode()
+    str_list = str_rep.split(']')
+    str_id = str_list[0][5:]
+    str_sign = str_list[1]
+    return messageSign(str_to_point(str_id),int(str_sign,16))
+
+
+#class pour wrapper l'envoie de message en ayant l'information de où vient le message
+class messageSign:
+    def __init__(self, _id, _sign):
+        self.sign = _sign
+        self.id = _id
+
+    def __bytes__(self):
+        return b''.join(["[ID :".encode('utf-8') ,repr(self.id).encode('utf-8'),"]".encode('utf-8') , hex(self.sign).encode('utf-8')])
 
 #Déroulement de l'algo
 class SignScheme:

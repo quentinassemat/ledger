@@ -19,10 +19,11 @@ while len(PUBKEYS) < nb_participant:
             print("Erreur de reception")
         else:
             PUBKEYS.append(str_to_point(donnees.decode()))
-            print(f"On a {len(PUBKEYS)} clefs publiques")
             client.close()
     finally:
         client.close()
+
+print(f"On a reçu les clefs publiques")
 
 #On a récolté les clé publiques. On ne travaillera plus qu'avec ces personnes la (et ça nous permet de savoir de qui viennent les messages parce que dans la vraie vie on ne saura pas l'ordre)
 #On renvoie les clés publiques pour chaque signeurs possède la liste (bien que dans la vraie vie ils ont déjà la liste des clés publiques)
@@ -58,10 +59,11 @@ while count_nonce < nb_nonces * nb_participant:
                 if PUBKEYS[i] == mes.id: 
                     R[i].append(mes.point) #on suppose ques les nonces sont envoyés dans l'ordre pour chaque joueur
                     count_nonce += 1
-            print(f"On a {count_nonce} nonce")
             client.close()
     finally:
         client.close()
+
+print(f"On a reçu les nonces")
 
 #On a reçu les nonces. 
 #Second Signing step (Sign' and communication round)
@@ -77,3 +79,41 @@ while count_signers < nb_participant:
         count_signers += 1
     finally:
         client.close()
+
+print(f"On a renvoyé les nonces")
+
+count_sign = 0
+S = [0] * nb_participant
+
+while count_sign < nb_participant:
+    try:
+        client, adresseClient = serveur.accept()
+        donnees = client.recv(MEM)
+        if not donnees:
+            print("Erreur de reception")
+        else:
+            mes = bytesrep_to_messageSign(donnees)
+            for i in range(nb_participant):
+                if PUBKEYS[i] == mes.id: 
+                    S[i] = mes.sign #on suppose ques les nonces sont envoyés dans l'ordre pour chaque joueur
+                    count_sign += 1
+            client.close()
+    finally:
+        client.close()
+
+print("On a reçu les signatures")
+
+#On renvoie les signatures aux autres gens
+
+count_sign = 0
+
+while count_sign < nb_participant:
+    try:
+        client, adresseClient = serveur.accept()
+        client.sendall(listint_to_bytes(S))
+        count_sign += 1
+    finally:
+        client.close()
+
+print("On a renvoyé les signatures")
+print("Le serveur a finit son travail")

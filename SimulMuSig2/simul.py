@@ -68,17 +68,17 @@ for l in range(nb_participant):
 b = [[1] * nb_nonces for i in range(nb_participant)]
 for l in range(nb_participant):
     for j in range(1, nb_nonces):
-        b[j] = int.from_bytes(hl.sha256(b''.join([bytes(j), (Xtildes[l].x.val).to_bytes(N_bytes, 'big')] + [(
+        b[l][j] = int.from_bytes(hl.sha256(b''.join([bytes(j), (Xtildes[l].x.val).to_bytes(N_bytes, 'big')] + [(
             Rn[l][i].x.val).to_bytes(N_bytes, 'big') for i in range(len(Rn[l]))] + [bytearray(M, 'utf-16')])).digest(), 'big') % n
 
 #on calcule R
 Rsign = [E]*nb_participant
 for l in range(nb_participant):
     for j in range(nb_nonces):
-        Rsign[l] = Rsign[l].complete_add_unsafe(b[j] * Rn[l][j])
+        Rsign[l] = Rsign[l].complete_add_unsafe(b[l][j] * Rn[l][j])
 
 #on calcule c
-c = [int.from_bytes(hl.sha256(b''.join([(Xtildes[l].x.val).to_bytes(N_bytes, 'big'), (Rsign.x.val).to_bytes(N_bytes, 'big'), bytearray(M, 'utf-16')])).digest(), 'big') % n for l in range(nb_participant)]
+c = [int.from_bytes(hl.sha256(b''.join([(Xtildes[l].x.val).to_bytes(N_bytes, 'big'), (Rsign[l].x.val).to_bytes(N_bytes, 'big'), bytearray(M, 'utf-16')])).digest(), 'big') % n for l in range(nb_participant)]
 
 
 #on calcule s
@@ -86,6 +86,35 @@ s = [0]*nb_participant
 for i in range(nb_participant):
     temp = 0
     for j in range(nb_nonces):
-        temp += ((SimulSigners[i]).list_r[j] * b[j]) % n
-    s[i] = (c*a[i]*(self.Signers[i]).key + temp) % n
+        temp += ((SimulSigners[i]).list_r[j] * b[i][j]) % n
+    s[i] = (c[i]*A[i][i]*(SimulSigners[i]).key + temp) % n
+
+
+#On envoie s_i
+mes_sign = [messageSign(SimulSigners[i].KEY,s[i]) for i in range(nb_participant)]
+for i in range(nb_participant):
+    client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    client.connect((ADRESSE, PORT))
+    client.send(
+        bytes(mes_sign[i]))
+    client.close()
+
+#Reception des signatures
+Sign = [[0] * nb_participant] 
+for l in range(nb_participant):
+    client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    client.connect((ADRESSE, PORT))
+    donnees = client.recv(MEM)
+    Nonces[l] = bytes_to_listint(donnees)
+    client.close()
+
 ssign = (sum(s)) % n
+
+print(f"La signature est {ssign}")
+
+print(f"La vérification du Signeur 1 donne {(ssign * G) == (Rsign[0] + (c[0] * Xtildes[0]))}")
+
+R,s = FakeKey(G)
+print(f"Une signature aléatoire donne : {(s * G) == (R + (c[0] * Xtildes[0]))}")
+
+print(f"On a finit simul")
