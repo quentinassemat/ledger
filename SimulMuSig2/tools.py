@@ -1,5 +1,6 @@
 #Importation des librairies
 
+from operator import truediv
 from sympy import isprime
 
 #On prend secrets car random n'est pas fiable pour la cryptographie
@@ -15,6 +16,8 @@ from arithm.field import Field, FieldElement
 
 #pour la communication tcp
 import socket
+
+import sys
 
 #on travaille avec secp256K1 : voici quelques constantes :
 #G est le générateur de notre groupe
@@ -35,7 +38,7 @@ E = Point(F(0), F(1), F(0), secp256k1)
 #Données de communication serveur 
 ADRESSE = 'localhost'
 PORT = 1234
-MEM = 4096 #mémoire nécessaire pour communiquer les infos durant les étapes de communications
+MEM = 16496 #mémoire nécessaire pour communiquer les infos durant les étapes de communications
 
 #Paramètres pour la signature
 nb_participant = 6
@@ -55,17 +58,26 @@ class Signer:
         for i in range(len(self.list_r)):
             self.list_r[i] = sct.randbelow(n)
 
-def str_to_point(str_point):
-    temp = str_point[1:len(str_point)-1]
-    list_temp = temp.split(" : ")
-    return Point(FieldElement(int(list_temp[0],16),F),FieldElement(int(list_temp[1],16),F) , FieldElement(int(list_temp[2],16),F), secp256k1)
+def point_to_bytes(p):
+    res = bytearray(b"(")
+    res.extend((p.x.val).to_bytes(N_bytes, 'big'))
+    res.extend(b' : ')
+    res.extend((p.y.val).to_bytes(N_bytes, 'big'))
+    res.extend(b' : ')
+    res.extend((p.z.val).to_bytes(N_bytes, 'big'))
+    res.extend(b')')
+    return bytes(res)
 
-def bytesrep_to_messagePoint(bytes):
-    str_rep = bytes.decode()
-    str_list = str_rep.split(']')
-    str_id = str_list[0][5:]
-    str_point = str_list[1]
-    return messagePoint(str_to_point(str_id),str_to_point(str_point))
+def bytes_to_point(bytes_point):
+    temp = bytes_point[1:len(bytes_point)-1]
+    list_temp = temp.split(b' : ')
+    return Point(FieldElement(int.from_bytes(list_temp[0], 'big'),F),FieldElement(int.from_bytes(list_temp[1], 'big'),F), FieldElement(int.from_bytes(list_temp[2], 'big'),F), secp256k1)
+
+def bytesrep_to_messagePoint(bytesrep):
+    bytesrep_list = bytesrep.split(b' ] ')
+    str_id = bytesrep_list[0][5:]
+    str_point = bytesrep_list[1]
+    return messagePoint(bytes_to_point(str_id),bytes_to_point(str_point))
 
 def matPoint_to_bytes(R): #pour envoyer matrice de point 
     n = len(R) #censé être nb_participant
@@ -73,33 +85,32 @@ def matPoint_to_bytes(R): #pour envoyer matrice de point
     L = []
     for i in range(n-1):
         for j in range(m - 1):
-            L.append(repr(R[i][j]).encode())
-            L.append(b';')
-        L.append(repr(R[i][m-1]).encode())
-        L.append(b'\n')
+            L.append(point_to_bytes(R[i][j]))
+            L.append(b' ; ')
+        L.append(point_to_bytes(R[i][m-1]))
+        L.append(b' \n ')
     for j in range(m- 1):
-        L.append(repr(R[n-1][j]).encode())
-        L.append(b';')
-    L.append(repr(R[n-1][m-1]).encode())
+        L.append(point_to_bytes(R[n-1][j]))
+        L.append(b' ; ')
+    L.append(point_to_bytes(R[n-1][m-1]))
     return b''.join(L)
 
 def bytes_to_matPoint(bytes):
     R = [[E]*nb_nonces for i in range(nb_participant)]
-    s = bytes.decode()
-    list1 = s.split('\n')
+    list1 = bytes.split(b' \n ')
     for i in range(nb_participant):
-        L = list1[i].split(';')
+        L = list1[i].split(b' ; ')
         for j in range(nb_nonces):
-            R[i][j] = str_to_point(L[j])
+            R[i][j] = bytes_to_point(L[j])
     return R
         
 def listPoint_to_bytes(L):
     n = len(L)
     res = []
     for i in range(n-1):
-        res.append(repr(L[i]).encode())
-        res.append(b';')
-    res.append(repr(L[n-1]).encode())
+        res.append(point_to_bytes(L[i]))
+        res.append(b' ; ')
+    res.append(point_to_bytes(L[n-1]))
     return b''.join(res)
 
 def listint_to_bytes(L):
@@ -107,23 +118,21 @@ def listint_to_bytes(L):
     res = []
     for i in range(n-1):
         res.append(hex(L[i]).encode())
-        res.append(b';')
+        res.append(b' ; ')
     res.append(hex(L[n-1]).encode())
     return b''.join(res)
 
 def bytes_to_list(bytes): #pour communiquer la liste des clefs publiques (même si censé déjà les avoir)
     L = [E] * nb_participant
-    s = bytes.decode()
-    temp = s.split(';')
+    temp = bytes.split(b' ; ')
     assert len(temp) == nb_participant
     for i in range(nb_participant):
-        L[i] = str_to_point(temp[i])
+        L[i] = bytes_to_point(temp[i])
     return L
 
 def bytes_to_listint(bytes):
     L = [0] * nb_participant
-    s = bytes.decode()
-    temp = s.split(';')
+    temp = bytes.split(b' ; ')
     assert len(temp) == nb_participant
     for i in range(nb_participant):
         L[i] = int(temp[i],16)
@@ -137,15 +146,13 @@ class messagePoint:
         self.id = _id
 
     def __bytes__(self):
-        return b''.join(["[ID :".encode('utf-8') ,repr(self.id).encode('utf-8'),"]".encode('utf-8') , repr(self.point).encode('utf-8')])
+        return b''.join(["[ID :".encode('utf-8') ,point_to_bytes(self.id)," ] ".encode('utf-8') , point_to_bytes(self.point)])
 
 def bytesrep_to_messageSign(bytes):
-    str_rep = bytes.decode()
-    str_list = str_rep.split(']')
+    str_list = bytes.split(b']')
     str_id = str_list[0][5:]
     str_sign = str_list[1]
-    return messageSign(str_to_point(str_id),int(str_sign,16))
-
+    return messageSign(bytes_to_point(str_id),int.from_bytes(str_sign, 'big'))
 
 #class pour wrapper l'envoie de message en ayant l'information de où vient le message
 class messageSign:
@@ -154,81 +161,18 @@ class messageSign:
         self.id = _id
 
     def __bytes__(self):
-        return b''.join(["[ID :".encode('utf-8') ,repr(self.id).encode('utf-8'),"]".encode('utf-8') , hex(self.sign).encode('utf-8')])
-
-#Déroulement de l'algo
-class SignScheme:
-    def __init__(self, nb_participant, nb_nonces):
-        self.nb_participant = nb_participant
-        self.nb_nonces = nb_nonces
-        self.SignersPUBKEY = [E]  # (Alice, Bob)
-
-
-    def Sign(self):
-        nb_participant = self.nb_participant
-        nb_nonces = self.nb_nonces
-
-        # R[i][j] is Rij. Rij est (Rij.x, Rij.y) (attention deux coordonnées)
-        R = [[E]*nb_nonces for i in range(nb_participant)]
-
-        #First Signing step (Sign and communication round)
-        for i in range(nb_participant):
-            self.Signers[i].gen_r()
-            for j in range(nb_nonces):
-                R[i][j] = (self.Signers[i].list_r[j]) * G  # partage des R.
-
-        #Second Signing step (Sign' and communication round)
-
-        #on calcule les ai
-        a = [(int.from_bytes(hl.sha256(b''.join([(L[l].x.val).to_bytes(N_bytes, 'big') for l in range(
-            nb_participant)] + [(L[i].x.val).to_bytes(N_bytes, 'big')])).digest(), 'big') % n) for i in range(nb_participant)]
-
-        #on calcule Xtilde
-        Xtilde = E
-        for i in range(nb_participant):
-            Xtilde = Xtilde.complete_add_unsafe(a[i] * L[i])
-        self.Xtilde = Xtilde
-
-        #on calcule les Rj pour j entre 1 et v
-        Rn = [E]*nb_nonces
-        for j in range(nb_nonces):
-            for i in range(nb_participant):
-                Rn[j] = Rn[j].complete_add_unsafe(R[i][j])
-
-        #on calcule le vecteur b
-        b = [1] * nb_nonces
-        for j in range(1, nb_nonces):
-            b[j] = int.from_bytes(hl.sha256(b''.join([bytes(j), (Xtilde.x.val).to_bytes(N_bytes, 'big')] + [(
-                Rn[i].x.val).to_bytes(N_bytes, 'big') for i in range(len(Rn))] + [bytearray(M, 'utf-16')])).digest(), 'big') % n
-
-        #on calcule R
-        Rsign = E
-        for j in range(nb_nonces):
-            Rsign = Rsign.complete_add_unsafe(b[j] * Rn[j])
-
-        #on calcule c
-        c = int.from_bytes(hl.sha256(b''.join([(Xtilde.x.val).to_bytes(N_bytes, 'big'), (
-            Rsign.x.val).to_bytes(N_bytes, 'big'), bytearray(M, 'utf-16')])).digest(), 'big') % n
-        self.c = c
-
-        #on calcule s
-        s = [0]*nb_participant
-        for i in range(nb_participant):
-            temp = 0
-            for j in range(nb_nonces):
-                temp += ((self.Signers[i]).list_r[j] * b[j]) % n
-            s[i] = (c*a[i]*(self.Signers[i]).key + temp) % n
-        ssign = (sum(s)) % n
-
-        #on renvoie la signature
-        return (Rsign, ssign)
-
-    def verif(self, R, s):
-        return (s * G) == (R + (self.c * self.Xtilde))
-
+        return b''.join(["[ID :".encode('utf-8') ,point_to_bytes(self.id),"]".encode('utf-8') , hex(self.sign).encode('utf-8')])
 
 #Génération de signature aléatoire
 def FakeKey(G):
     return (sct.randbelow(n) * G, sct.randbelow(n))
 
-
+def input_yes_no():
+    while True:
+        str = input("")
+        if str == "yes":
+            return True
+        elif str == "no":
+            return False
+        else:
+            print("Please enter a valid input (yes/no)")

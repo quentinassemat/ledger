@@ -11,6 +11,8 @@ serveur.listen(1)
 #Collecte des id (clé publiques) des signeurs:
 PUBKEYS = []
 
+print("La socket est bind, nous pouvons commencer")
+
 while len(PUBKEYS) < nb_participant:
     try:
         client, adresseClient = serveur.accept()
@@ -18,12 +20,13 @@ while len(PUBKEYS) < nb_participant:
         if not donnees:
             print("Erreur de reception")
         else:
-            PUBKEYS.append(str_to_point(donnees.decode()))
+            PUBKEYS.append(bytes_to_point(donnees))
             client.close()
     finally:
         client.close()
 
 print(f"On a reçu les clefs publiques")
+
 
 #On a récolté les clé publiques. On ne travaillera plus qu'avec ces personnes la (et ça nous permet de savoir de qui viennent les messages parce que dans la vraie vie on ne saura pas l'ordre)
 #On renvoie les clés publiques pour chaque signeurs possède la liste (bien que dans la vraie vie ils ont déjà la liste des clés publiques)
@@ -37,6 +40,8 @@ while count_pubkeys < nb_participant:
         count_pubkeys += 1
     finally:
         client.close()
+
+print(f"On a envoyé les clefs publiques")
 
 #Maintenant les signeurs calculent de leur côté le nonce et on le récolte
 #First Signing step (Sign and communication round)
@@ -117,3 +122,4 @@ while count_sign < nb_participant:
 
 print("On a renvoyé les signatures")
 print("Le serveur a finit son travail")
+serveur.close()
