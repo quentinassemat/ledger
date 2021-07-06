@@ -60,7 +60,7 @@ while count_nonce < nb_nonces * nb_participant:
             print("Erreur de reception")
         else:
             mes = bytesrep_to_messagePoint(donnees)
-            for i in range(nb_participant):
+            for i in range(nb_participant): #on vérifie que les nonces proviennent bien de la liste des clefs publiques
                 if PUBKEYS[i] == mes.id: 
                     R[i].append(mes.point) #on suppose ques les nonces sont envoyés dans l'ordre pour chaque joueur
                     count_nonce += 1

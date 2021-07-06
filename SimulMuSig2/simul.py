@@ -11,6 +11,11 @@ SimulSigners = [Signer(nb_nonces) for i in range(NB_SIMUL)]
 R = [[E]*nb_nonces for i in range(nb_participant)]
 Nonces = [R] * NB_SIMUL #Nonces contient NB_SIMUL fois la même chose mais c'est pour simuler qu'il y a bien plusieurs signeurs simulé par ce py
 
+print(f"Voulez vous commencer la signature ? (Envoyer clefs publiques)")
+cont = input_yes_no()
+if cont == False:
+    sys.exit()
+
 #Envoie des clefs publiques au serveur
 count_pubkeys = 0
 while count_pubkeys < NB_SIMUL:
@@ -23,7 +28,7 @@ while count_pubkeys < NB_SIMUL:
     finally: 
         client.close()
 
-print(f"On a envoyé les clefs publiques, Voulez vous continuer la signature ?")
+print(f"On a envoyé les clefs publiques, Voulez vous continuer la signature ? (Recevoir clefs publiques)")
 cont = input_yes_no()
 if cont == False:
     sys.exit()
@@ -43,7 +48,7 @@ while count_pubkeys < NB_SIMUL:
     finally:
         client.close()
 
-print(f"On a reçu les clefs publiques, Voulez vous continuer la signature ?")
+print(f"On a reçu les clefs publiques, Voulez vous continuer la signature ? (Envoyer les nonces)")
 cont = input_yes_no()
 if cont == False:
     sys.exit()
@@ -68,7 +73,7 @@ while i < NB_SIMUL:
             client.close()
     i += 1
 
-print(f"On a envoyé les clefs nonces, Voulez vous continuez la signature ?");
+print(f"On a envoyé les clefs nonces, Voulez vous continuez la signature ? (Reception des nonces)");
 cont = input_yes_no()
 if cont == False:
     sys.exit()
@@ -91,7 +96,7 @@ while count_nonces < NB_SIMUL:
 A = [] # correspond à NB_SIMUL fois les ai pour simuler les signeurs indépendants
 for k in range(NB_SIMUL):
     A.append([(int.from_bytes(hl.sha256(b''.join([(PUBKEYS[k][l].x.val).to_bytes(N_bytes, 'big') for l in range(
-    nb_participant)] + [(SimulSigners[i].KEY.x.val).to_bytes(N_bytes, 'big')])).digest(), 'big') % n) for i in range(nb_participant)])
+    nb_participant)] + [(PUBKEYS[k][i].x.val).to_bytes(N_bytes, 'big')])).digest(), 'big') % n) for i in range(nb_participant)])
 
 Xtildes = [E] * NB_SIMUL
 for l in range(NB_SIMUL):
@@ -114,7 +119,7 @@ for l in range(NB_SIMUL):
 
 #on calcule R
 Rsign = [E]*NB_SIMUL
-for l in range(nb_participant):
+for l in range(NB_SIMUL):
     for j in range(nb_nonces):
         Rsign[l] = Rsign[l].complete_add_unsafe(b[l][j] * Rn[l][j])
 
@@ -130,6 +135,10 @@ for i in range(NB_SIMUL):
         temp += ((SimulSigners[i]).list_r[j] * b[i][j]) % n
     s[i] = (c[i]*A[i][i]*(SimulSigners[i]).key + temp) % n
 
+print(f"On a calculé les signatures partielles, Voulez vous continuez la signature ? (Envoies des signatures partielles)");
+cont = input_yes_no()
+if cont == False:
+    sys.exit()
 
 #On envoie s_i
 mes_sign = [messageSign(SimulSigners[i].KEY,s[i]) for i in range(NB_SIMUL)]
@@ -144,6 +153,12 @@ while count_sign < NB_SIMUL:
         count_sign += 1
     finally:
         client.close()
+
+
+print(f"On a envoyé les signatures partielles, Voulez vous continuez la signature ? (Reception des signatures partielles)");
+cont = input_yes_no()
+if cont == False:
+    sys.exit()
 
 #Reception des signatures
 Sign = [[0] * nb_participant] 
