@@ -110,12 +110,12 @@ for l in range(NB_SIMUL):
         for i in range(nb_participant):
             Rn[l][j] = Rn[l][j].complete_add_unsafe(Nonces[l][i][j])
 
-#on calcule le vecteur b
+#on calcule le vecteur b (À CHANGER AVEC LA NOUVELLE VERSION DE MUSIG2)
 b = [[1] * nb_nonces for i in range(NB_SIMUL)]
 for l in range(NB_SIMUL):
     for j in range(1, nb_nonces):
         b[l][j] = int.from_bytes(hl.sha256(b''.join([bytes(j), (Xtildes[l].x.val).to_bytes(N_bytes, 'big')] + [(
-            Rn[l][i].x.val).to_bytes(N_bytes, 'big') for i in range(len(Rn[l]))] + [bytearray(M, 'utf-16')])).digest(), 'big') % n
+            Rn[l][i].x.val).to_bytes(N_bytes, 'big') for i in range(len(Rn[l]))] + [bytearray(M, 'utf-8')])).digest(), 'big') % n
 
 #on calcule R
 Rsign = [E]*NB_SIMUL
@@ -124,7 +124,7 @@ for l in range(NB_SIMUL):
         Rsign[l] = Rsign[l].complete_add_unsafe(b[l][j] * Rn[l][j])
 
 #on calcule c
-c = [int.from_bytes(hl.sha256(b''.join([(Xtildes[l].x.val).to_bytes(N_bytes, 'big'), (Rsign[l].x.val).to_bytes(N_bytes, 'big'), bytearray(M, 'utf-16')])).digest(), 'big') % n for l in range(NB_SIMUL)]
+c = [int.from_bytes(hl.sha256(b''.join([(Xtildes[l].x.val).to_bytes(N_bytes, 'big'), (Rsign[l].x.val).to_bytes(N_bytes, 'big'), bytearray(M, 'utf-8')])).digest(), 'big') % n for l in range(NB_SIMUL)]
 
 
 #on calcule s
@@ -161,21 +161,21 @@ if cont == False:
     sys.exit()
 
 #Reception des signatures
-Sign = [[0] * nb_participant] 
+Sign = [[0] * nb_participant for l in range(NB_SIMUL)] 
 
 count_sign = 0
-while count_sign < nb_participant:
+while count_sign < NB_SIMUL:
     try:
         client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         client.connect((ADRESSE, PORT))
         donnees = client.recv(MEM)
-        Nonces[count_sign] = bytes_to_listint(donnees)
+        Sign[count_sign] = bytes_to_listint(donnees)
         client.close()
         count_sign += 1
     finally:
         client.close()
 
-ssign = (sum(s)) % n
+ssign = (sum(Sign[0])) % n
 
 print(f"La signature est {ssign}")
 

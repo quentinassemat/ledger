@@ -1,23 +1,27 @@
-use k256::elliptic_curve::sec1::FromEncodedPoint;
+#![warn(clippy::many_single_char_names)]
+
 use k256::elliptic_curve::group::ff::PrimeField;
+use k256::elliptic_curve::sec1::FromEncodedPoint;
 use k256::{AffinePoint, EncodedPoint, ProjectivePoint, Scalar, ScalarBytes};
 
 use std::convert::TryFrom;
 use std::io::{stdin, Read, Write};
 use std::net::TcpStream;
-use std::ops::Mul;
+use std::ops::{Add, Mul};
 
 use crypto::digest::Digest;
 use crypto::sha2::Sha256;
-
 
 // CONSTANTES UTILES
 
 pub const ADRESSE: &str = "localhost";
 pub const PORT: u16 = 1234;
+
 pub const NB_NONCES: u32 = 3;
 pub const NB_PARTICIPANT: u32 = 6;
 pub const MEM: usize = 16496;
+
+pub const M: &str = "Alice donne 1 Bitcoin à Bob";
 
 // STRUCTURE DE DONNÉES
 
@@ -28,6 +32,15 @@ pub struct Signer {
     pub public_nonces: Vec<ProjectivePoint>,
     pub pubkeys: Vec<ProjectivePoint>,
     pub nonces: Vec<Vec<ProjectivePoint>>,
+    pub a: Vec<Scalar>,
+    pub selfa: Scalar,
+    pub xtilde: ProjectivePoint,
+    pub r_nonces: Vec<ProjectivePoint>,
+    pub b: Vec<Scalar>,
+    pub rsign: ProjectivePoint,
+    pub c: Scalar,
+    pub selfsign: Scalar,
+    pub sign: Vec<Scalar>,
 
     //éléments secrets
     secret_key: Scalar,
@@ -44,14 +57,32 @@ impl Signer {
         let public_nonces: Vec<ProjectivePoint> = Vec::new();
         let pubkeys: Vec<ProjectivePoint> = Vec::new();
         let nonces: Vec<Vec<ProjectivePoint>> = Vec::new();
+        let a: Vec<Scalar> = Vec::new();
+        let selfa = Scalar::default();
+        let xtilde = ProjectivePoint::default();
+        let r_nonces: Vec<ProjectivePoint> = Vec::new();
+        let b: Vec<Scalar> = Vec::new();
+        let rsign = ProjectivePoint::default();
+        let c = Scalar::default();
+        let selfsign = Scalar::default();
+        let sign: Vec<Scalar> = Vec::new();
 
         Signer {
             public_key,
-            secret_key,
-            secret_list_r,
             public_nonces,
             pubkeys,
             nonces,
+            a,
+            selfa,
+            xtilde,
+            r_nonces,
+            b,
+            rsign,
+            c,
+            selfsign,
+            sign,
+            secret_key,
+            secret_list_r,
         }
     }
 
@@ -66,8 +97,10 @@ impl Signer {
         }
     }
 
+    //FONCTIONS DE CALCUL DU SIGNEUR
+
     //fonction calcul des ai
-    pub fn a(&self) -> Vec<Scalar> {
+    pub fn a(&mut self) -> Vec<Scalar> {
         let mut a: Vec<Scalar> = Vec::new();
         for i in 0..NB_PARTICIPANT {
             let mut hash = Sha256::new();
@@ -75,19 +108,9 @@ impl Signer {
             //on construit les bytes qui servent pour la hash
             let mut bytes: Vec<u8> = Vec::new();
             for j in 0..NB_PARTICIPANT {
-                let affine_p = AffinePoint::from(self.pubkeys[j as usize]);
-                let encoded_p = EncodedPoint::from(affine_p);
-                match encoded_p.x() {
-                    Some(x) => bytes.extend(x),
-                    None => eprintln!("Erreur"),
-                }
+                bytes.extend(point_to_bytes_4hash(self.pubkeys[j as usize]));
             }
-            let affine_p = AffinePoint::from(self.pubkeys[i as usize]);
-            let encoded_p = EncodedPoint::from(affine_p);
-            match encoded_p.x() {
-                Some(x) => bytes.extend(x),
-                None => eprintln!("Erreur"),
-            }
+            bytes.extend(point_to_bytes_4hash(self.pubkeys[i as usize]));
 
             //on le met dans le hash
             hash.input(bytes.as_slice());
@@ -97,13 +120,117 @@ impl Signer {
             //On construit le Scalar qui corrrespond
             match ScalarBytes::try_from(&ai[..]) {
                 Ok(ai_scal) => match Scalar::from_repr(ai_scal.into_bytes()) {
-                    Some(x) => a.push(x),
+                    Some(x) => {
+                        a.push(x);
+                        if self.pubkeys[i as usize] == self.public_key {
+                            self.selfa = x;
+                        }
+                    }
                     None => eprintln!("Erreur "),
                 },
                 Err(e) => eprintln!("Erreur : {:?}", e),
             }
         }
         a
+    }
+
+    //fonction de calcul de x_tilde :
+    pub fn xtilde(&self) -> ProjectivePoint {
+        let mut xtilde = ProjectivePoint::identity();
+        for i in 0..NB_PARTICIPANT {
+            xtilde = xtilde.add(self.pubkeys[i as usize].mul(self.a[i as usize]));
+        }
+        xtilde
+    }
+
+    //fonction de calcul de r_nonces :
+    pub fn r_nonces(&self) -> Vec<ProjectivePoint> {
+        let mut r_nonces: Vec<ProjectivePoint> = Vec::new();
+        for j in 0..NB_NONCES {
+            let mut temp = ProjectivePoint::identity();
+            for i in 0..NB_PARTICIPANT {
+                temp = temp.add(self.nonces[i as usize][j as usize]);
+            }
+            r_nonces.push(temp);
+        }
+        r_nonces
+    }
+
+    //fonction de calcul de b :
+    pub fn b(&self) -> Vec<Scalar> {
+        let mut b: Vec<Scalar> = Vec::new();
+        b.push(Scalar::from(1_u32));
+        for j in 1..NB_NONCES {
+            let mut hash = Sha256::new();
+
+            //on construit les bytes qui servent pour le hash
+            let mut bytes: Vec<u8> = Vec::new();
+            bytes.extend(j.to_be_bytes());
+            bytes.extend(point_to_bytes_4hash(self.xtilde));
+            for j in 0..NB_NONCES {
+                bytes.extend(point_to_bytes_4hash(self.r_nonces[j as usize]));
+            }
+            bytes.extend(M.bytes());
+
+            //on le met dans le hash
+            hash.input(bytes.as_slice());
+            let mut bi: [u8; 32] = [0; 32];
+            hash.result(&mut bi);
+
+            //On construit le Scalar qui corrrespond
+            match ScalarBytes::try_from(&bi[..]) {
+                Ok(bi_scal) => match Scalar::from_repr(bi_scal.into_bytes()) {
+                    Some(x) => b.push(x),
+                    None => eprintln!("Erreur "),
+                },
+                Err(e) => eprintln!("Erreur : {:?}", e),
+            }
+        }
+        b
+    }
+
+    //fonction de calcul de R:
+    pub fn rsign(&self) -> ProjectivePoint {
+        let mut rsign = ProjectivePoint::identity();
+        for j in 0..NB_NONCES {
+            rsign = rsign.add(self.r_nonces[j as usize].mul(self.b[j as usize]));
+        }
+        rsign
+    }
+
+    //fonction de calcul de c:
+    pub fn c(&self) -> Scalar {
+        let mut hash = Sha256::new();
+        let mut bytes: Vec<u8> = Vec::new();
+        bytes.extend(point_to_bytes_4hash(self.xtilde));
+        bytes.extend(point_to_bytes_4hash(self.rsign));
+        bytes.extend(M.bytes());
+        hash.input(bytes.as_slice());
+        let mut b: [u8; 32] = [0; 32];
+        hash.result(&mut b);
+        let mut c = Scalar::from(0_u32);
+        match ScalarBytes::try_from(&b[..]) {
+            Ok(b_scal) => match Scalar::from_repr(b_scal.into_bytes()) {
+                Some(x) => c = x,
+                None => eprintln!("Erreur "),
+            },
+            Err(e) => eprintln!("Erreur : {:?}", e),
+        }
+        c
+    }
+
+    //fonction de calcul de sign :
+    pub fn selfsign(&self) -> Scalar {
+        let mut temp = Scalar::from(0_u32);
+        for j in 0..NB_NONCES {
+            temp = temp.add(self.secret_list_r[j as usize].mul(self.b[j as usize]));
+        }
+        ((self.c.mul(self.selfa)).mul(self.secret_key)).add(temp)
+    }
+
+    //fonction de vérif :
+    pub fn verif(&self) -> bool {
+        ProjectivePoint::generator().mul(self.selfsign) == self.rsign.add(self.xtilde.mul(self.c))
     }
 }
 
@@ -136,39 +263,74 @@ impl MessagePoint {
     }
 }
 
+pub struct MessageSign {
+    pub id: ProjectivePoint,
+    pub sign: Scalar,
+}
+
+impl MessageSign {
+    // constructeur
+    pub fn new(id: ProjectivePoint, sign: Scalar) -> MessageSign {
+        MessageSign { id, sign }
+    }
+
+    pub fn to_bytes(&self) -> Vec<u8> {
+        let mut res: Vec<u8> = Vec::new();
+        let id = "[ID :".as_bytes();
+        let crochet = " ] ".as_bytes();
+        res.extend(id.iter());
+        res.extend(point_to_bytes(self.id));
+        res.extend(crochet.iter());
+        res.extend(self.sign.to_bytes().as_slice());
+        res
+    }
+}
+
 // FONCTIONS DE CONVERSION BYTES -- TYPES
 
 pub fn point_to_bytes(p: ProjectivePoint) -> Vec<u8> {
     let mut res: Vec<u8> = Vec::new();
-    res.push(b'(');
+    let par = "(".as_bytes();
+    let deuxpoints = " : ".as_bytes();
+    let end = "0x1)".as_bytes();
+    res.extend(par);
     let encoded_p = k256::EncodedPoint::encode(p, false);
     encoded_p.is_identity();
     if let Some(x) = encoded_p.x() {
         if let Some(y) = encoded_p.y() {
             res.append(&mut x.to_vec());
-            res.push(b' ');
-            res.push(b':');
-            res.push(b' ');
+            res.extend(deuxpoints);
             res.append(&mut y.to_vec());
-            res.push(b' ');
-            res.push(b':');
-            res.push(b' ');
-            res.push(b'0');
-            res.push(b'x');
-            res.push(b'1');
-            res.push(b')');
+            res.extend(deuxpoints);
+            res.extend(end);
         } else {
             // correspond au point à l'infini d'après la doc
-            return b"(0x0 : 0x1 : 0x0)".to_vec();
+            res.extend("(0x0 : 0x1 : 0x0)".as_bytes());
         }
     } else {
-        return b"(0x0 : 0x1 : 0x0)".to_vec();
+        res.extend("(0x0 : 0x1 : 0x0)".as_bytes());
     }
     res
 }
 
+pub fn point_to_bytes_4hash(p: ProjectivePoint) -> Vec<u8> {
+    let mut res: Vec<u8> = Vec::new();
+    let a = AffinePoint::from(p);
+    let e = EncodedPoint::from(a);
+    match e.x() {
+        Some(y) => {
+            res.extend(y.iter());
+            res
+        }
+        None => {
+            eprintln!("Erreur de conversion");
+            res
+        }
+    }
+}
+
 pub fn bytes_to_point(bytes: &[u8]) -> ProjectivePoint {
-    let l = bytes.len();
+    let len = bytes.len();
     let mut i = 1;
     let mut count = 0;
     let mut x: k256::ScalarBytes = k256::ScalarBytes::default();
@@ -176,9 +338,10 @@ pub fn bytes_to_point(bytes: &[u8]) -> ProjectivePoint {
     let mut x_bits: Vec<u8> = Vec::new();
     let mut y_bits: Vec<u8> = Vec::new();
     let mut z_bits: Vec<u8> = Vec::new();
-    while i < l - 3 {
+    while i < len - 3 {
         if count == 0 {
-            while (i < l - 3) && (bytes[i] != b' ' || bytes[i + 1] != b':' || bytes[i + 2] != b' ')
+            while (i < len - 3)
+                && (bytes[i] != b' ' || bytes[i + 1] != b':' || bytes[i + 2] != b' ')
             {
                 x_bits.push(bytes[i]);
                 i += 1;
@@ -187,7 +350,8 @@ pub fn bytes_to_point(bytes: &[u8]) -> ProjectivePoint {
             i += 3;
         }
         if count == 1 {
-            while (i < l - 3) && (bytes[i] != b' ' || bytes[i + 1] != b':' || bytes[i + 2] != b' ')
+            while (i < len - 3)
+                && (bytes[i] != b' ' || bytes[i + 1] != b':' || bytes[i + 2] != b' ')
             {
                 y_bits.push(bytes[i]);
                 i += 1;
@@ -196,7 +360,7 @@ pub fn bytes_to_point(bytes: &[u8]) -> ProjectivePoint {
             i += 3;
         }
         if count == 2 {
-            while i < l - 3 && bytes[i - 1] != b')' {
+            while i < len - 3 && bytes[i - 1] != b')' {
                 z_bits.push(bytes[i]);
                 i += 1;
             }
@@ -246,6 +410,25 @@ pub fn bytes_to_list(bytes: &[u8]) -> Vec<ProjectivePoint> {
     res
 }
 
+pub fn bytes_to_list_scalar(bytes: &[u8]) -> Vec<Scalar> {
+    let mut res: Vec<Scalar> = Vec::new();
+    let l = bytes.len();
+    let mut i = 0;
+    let mut old_i = 0;
+    while i < l - 3 {
+        while i < l && (bytes[i] != b' ' || bytes[i + 1] != b';' || bytes[i + 2] != b' ') {
+            i += 1;
+        }
+        match ScalarBytes::try_from(&bytes[old_i..i]) {
+            Ok(x) => res.push(x.to_scalar()),
+            Err(e) => eprintln!("Erreur : {}", e),
+        }
+        i += 3;
+        old_i = i;
+    }
+    res
+}
+
 pub fn bytes_to_mat(bytes: &[u8]) -> Vec<Vec<ProjectivePoint>> {
     // Vec[i][j] est le nonce j du signeur i
     let mut res: Vec<Vec<ProjectivePoint>> = Vec::new();
@@ -279,9 +462,9 @@ pub fn get_entry() -> String {
 // fonction yes_no() pour que l'utilisateur dise oui ou non à chaque étape
 pub fn yes_no() -> Result<bool, &'static str> {
     match &*get_entry() {
-        "yes" => return Ok(true),
-        "no" => return Ok(false),
-        _ => return Err("Please enter a valide input (yes/no)"),
+        "yes" => Ok(true),
+        "no" => Ok(false),
+        _ => Err("Please enter a valide input (yes/no)"),
     }
 }
 

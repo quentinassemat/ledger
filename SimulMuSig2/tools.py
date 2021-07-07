@@ -115,12 +115,12 @@ def listPoint_to_bytes(L):
 
 def listint_to_bytes(L):
     n = len(L)
-    res = []
+    res = bytearray(b"")
     for i in range(n-1):
-        res.append(hex(L[i]).encode())
-        res.append(b' ; ')
-    res.append(hex(L[n-1]).encode())
-    return b''.join(res)
+        res.extend(L[i].to_bytes(N_bytes, 'big'))
+        res.extend(b' ; ')
+    res.extend(L[n-1].to_bytes(N_bytes, 'big'))
+    return res
 
 def bytes_to_list(bytes): #pour communiquer la liste des clefs publiques (même si censé déjà les avoir)
     L = [E] * nb_participant
@@ -135,7 +135,7 @@ def bytes_to_listint(bytes):
     temp = bytes.split(b' ; ')
     assert len(temp) == nb_participant
     for i in range(nb_participant):
-        L[i] = int(temp[i],16)
+        L[i] = int.from_bytes(temp[i], 'big')
     return L
 
 
@@ -149,7 +149,7 @@ class messagePoint:
         return b''.join(["[ID :".encode('utf-8') ,point_to_bytes(self.id)," ] ".encode('utf-8') , point_to_bytes(self.point)])
 
 def bytesrep_to_messageSign(bytes):
-    str_list = bytes.split(b']')
+    str_list = bytes.split(b' ] ')
     str_id = str_list[0][5:]
     str_sign = str_list[1]
     return messageSign(bytes_to_point(str_id),int.from_bytes(str_sign, 'big'))
@@ -161,7 +161,7 @@ class messageSign:
         self.id = _id
 
     def __bytes__(self):
-        return b''.join(["[ID :".encode('utf-8') ,point_to_bytes(self.id),"]".encode('utf-8') , hex(self.sign).encode('utf-8')])
+        return b''.join(["[ID :".encode('utf-8') ,point_to_bytes(self.id)," ] ".encode('utf-8') , self.sign.to_bytes(N_bytes, 'big')])
 
 #Génération de signature aléatoire
 def FakeKey(G):

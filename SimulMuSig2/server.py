@@ -100,7 +100,7 @@ while count_sign < nb_participant:
             mes = bytesrep_to_messageSign(donnees)
             for i in range(nb_participant):
                 if PUBKEYS[i] == mes.id: 
-                    S[i] = mes.sign #on suppose ques les nonces sont envoyés dans l'ordre pour chaque joueur
+                    S[i] = mes.sign % n
                     count_sign += 1
             client.close()
     finally:
