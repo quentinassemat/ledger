@@ -13,6 +13,49 @@ PUBKEYS = []
 
 print("La socket est bind, nous pouvons commencer")
 
+# print("Faisons des test :")
+# print("Test échange point de la courbe/Projective point")
+# #on reçoit le générateur 
+# client, adresseClient = serveur.accept()
+# donnees = client.recv(MEM)
+# if not donnees:
+#     print("Erreur de reception")
+# else:
+#     print("générateur reçu :")
+#     print(bytes_to_point(donnees))
+#     print("générateur python :")
+#     print(G)
+#     if bytes_to_point(donnees) == G :
+#         print("la communication de point de la courbe est réussi")
+# client.close()
+
+# print("échange de message sign")
+# client, adresseClient = serveur.accept()
+# donnees = client.recv(MEM)
+# mes = messageSign(G, 1)
+# if not donnees:
+#     print("Erreur de reception")
+# else:
+#     print("mes reçu : ")
+#     print(bytesrep_to_messageSign(donnees).id)
+#     print(bytesrep_to_messageSign(donnees).sign)
+#     print("mes python :")
+#     print(mes.id)
+#     print(mes.sign)
+
+# print("échange de hash")
+# # on crée un hash
+# b = hl.sha256(b''.join( [(1).to_bytes(4, 'big')] +[(G.x.val).to_bytes(N_bytes, 'big') ] + [bytearray(M, 'utf-8')] )).digest() 
+
+# client, adresseClient = serveur.accept()
+# client.sendall(b)
+# client.close()
+
+# client, adresseClient = serveur.accept()
+# client.sendall((1).to_bytes(N_bytes, 'big'))
+# client.close()
+# sys.exit()
+
 while len(PUBKEYS) < nb_participant:
     try:
         client, adresseClient = serveur.accept()
@@ -26,7 +69,6 @@ while len(PUBKEYS) < nb_participant:
         client.close()
 
 print(f"On a reçu les clefs publiques")
-
 
 #On a récolté les clé publiques. On ne travaillera plus qu'avec ces personnes la (et ça nous permet de savoir de qui viennent les messages parce que dans la vraie vie on ne saura pas l'ordre)
 #On renvoie les clés publiques pour chaque signeurs possède la liste (bien que dans la vraie vie ils ont déjà la liste des clés publiques)
@@ -102,6 +144,7 @@ while count_sign < nb_participant:
                 if PUBKEYS[i] == mes.id: 
                     S[i] = mes.sign % n
                     count_sign += 1
+                    # print(f"s{i} : {mes.sign}")
             client.close()
     finally:
         client.close()
@@ -122,4 +165,29 @@ while count_sign < nb_participant:
 
 print("On a renvoyé les signatures")
 print("Le serveur a finit son travail")
+
+# print("on regarde la valeur de xtilde pour regarder")
+# client, adresseClient = serveur.accept()
+# donnees = client.recv(MEM)
+# print(bytes_to_point(donnees))
+# client.close()
+
+
+# print("on regarde la valeur de rsign pour regarder")
+# client, adresseClient = serveur.accept()
+# donnees = client.recv(MEM)
+# print(bytes_to_point(donnees))
+# client.close()
+
+# print("on regarde la valeur de ssign pour regarder")
+# client, adresseClient = serveur.accept()
+# donnees = client.recv(MEM)
+# print(bytesrep_to_messageSign(donnees).id)
+# print("signature de rust")
+# print(bytesrep_to_messageSign(donnees).sign)
+# print("signature pthon")
+# print(sum(S) % n)
+# client.close()
+
+
 serveur.close()

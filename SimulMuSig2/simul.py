@@ -102,6 +102,10 @@ Xtildes = [E] * NB_SIMUL
 for l in range(NB_SIMUL):
     for i in range(nb_participant):
         Xtildes[l] = Xtildes[l].complete_add_unsafe(A[l][i] * PUBKEYS[l][i])
+        Xtildes[l] = Xtildes[l].to_affine()
+
+# print("Xtilde")
+# print(Xtildes[0])
 
 #on calcule les Rj pour j entre 1 et v
 Rn = [[E]*nb_nonces for i in range(NB_SIMUL) ] #encore une fois on simule qu'il y a nb_participant signeurs indépendants
@@ -109,12 +113,13 @@ for l in range(NB_SIMUL):
     for j in range(nb_nonces):
         for i in range(nb_participant):
             Rn[l][j] = Rn[l][j].complete_add_unsafe(Nonces[l][i][j])
+            Rn[l][j] = Rn[l][j].to_affine()
 
 #on calcule le vecteur b (À CHANGER AVEC LA NOUVELLE VERSION DE MUSIG2)
 b = [[1] * nb_nonces for i in range(NB_SIMUL)]
 for l in range(NB_SIMUL):
     for j in range(1, nb_nonces):
-        b[l][j] = int.from_bytes(hl.sha256(b''.join([bytes(j), (Xtildes[l].x.val).to_bytes(N_bytes, 'big')] + [(
+        b[l][j] = int.from_bytes(hl.sha256(b''.join([(j).to_bytes(4, 'big')] + [(Xtildes[l].x.val).to_bytes(N_bytes, 'big')] + [(
             Rn[l][i].x.val).to_bytes(N_bytes, 'big') for i in range(len(Rn[l]))] + [bytearray(M, 'utf-8')])).digest(), 'big') % n
 
 #on calcule R
@@ -122,6 +127,10 @@ Rsign = [E]*NB_SIMUL
 for l in range(NB_SIMUL):
     for j in range(nb_nonces):
         Rsign[l] = Rsign[l].complete_add_unsafe(b[l][j] * Rn[l][j])
+    Rsign[l] = Rsign[l].to_affine()
+
+# print("Rsign")
+# print(Rsign[0])
 
 #on calcule c
 c = [int.from_bytes(hl.sha256(b''.join([(Xtildes[l].x.val).to_bytes(N_bytes, 'big'), (Rsign[l].x.val).to_bytes(N_bytes, 'big'), bytearray(M, 'utf-8')])).digest(), 'big') % n for l in range(NB_SIMUL)]
@@ -134,6 +143,9 @@ for i in range(NB_SIMUL):
     for j in range(nb_nonces):
         temp += ((SimulSigners[i]).list_r[j] * b[i][j]) % n
     s[i] = (c[i]*A[i][i]*(SimulSigners[i]).key + temp) % n
+    # print(f"s{i}")
+    # print(s[i])
+
 
 print(f"On a calculé les signatures partielles, Voulez vous continuez la signature ? (Envoies des signatures partielles)");
 cont = input_yes_no()

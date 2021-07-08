@@ -193,7 +193,7 @@ impl Signer {
     pub fn rsign(&self) -> ProjectivePoint {
         let mut rsign = ProjectivePoint::identity();
         for j in 0..NB_NONCES {
-            rsign = rsign.add(self.r_nonces[j as usize].mul(self.b[j as usize]));
+            rsign = rsign + (self.r_nonces[j as usize] * self.b[j as usize]);
         }
         rsign
     }
@@ -223,14 +223,18 @@ impl Signer {
     pub fn selfsign(&self) -> Scalar {
         let mut temp = Scalar::from(0_u32);
         for j in 0..NB_NONCES {
-            temp = temp.add(self.secret_list_r[j as usize].mul(self.b[j as usize]));
+            temp = temp + (self.secret_list_r[j as usize] * self.b[j as usize]);
         }
-        ((self.c.mul(self.selfa)).mul(self.secret_key)).add(temp)
+        (self.c * self.selfa * self.secret_key) + temp
     }
 
     //fonction de vérif :
     pub fn verif(&self) -> bool {
-        ProjectivePoint::generator().mul(self.selfsign) == self.rsign.add(self.xtilde.mul(self.c))
+        let mut signature = Scalar::from(0_u32);
+        for i in 0..NB_PARTICIPANT {
+            signature = signature + self.sign[i as usize];
+        }
+        ProjectivePoint::generator() * signature == self.rsign + (self.xtilde * self.c)
     }
 }
 
@@ -292,22 +296,22 @@ pub fn point_to_bytes(p: ProjectivePoint) -> Vec<u8> {
     let mut res: Vec<u8> = Vec::new();
     let par = "(".as_bytes();
     let deuxpoints = " : ".as_bytes();
-    let end = "0x1)".as_bytes();
+    let parend = ")".as_bytes();
     res.extend(par);
     let encoded_p = k256::EncodedPoint::encode(p, false);
-    encoded_p.is_identity();
     if let Some(x) = encoded_p.x() {
         if let Some(y) = encoded_p.y() {
             res.append(&mut x.to_vec());
             res.extend(deuxpoints);
             res.append(&mut y.to_vec());
-            res.extend(deuxpoints);
-            res.extend(end);
+            res.extend_from_slice(parend);
         } else {
+            // à corriger
             // correspond au point à l'infini d'après la doc
             res.extend("(0x0 : 0x1 : 0x0)".as_bytes());
         }
     } else {
+        // à corriger
         res.extend("(0x0 : 0x1 : 0x0)".as_bytes());
     }
     res
@@ -332,48 +336,21 @@ pub fn point_to_bytes_4hash(p: ProjectivePoint) -> Vec<u8> {
 pub fn bytes_to_point(bytes: &[u8]) -> ProjectivePoint {
     let len = bytes.len();
     let mut i = 1;
-    let mut count = 0;
     let mut x: k256::ScalarBytes = k256::ScalarBytes::default();
     let mut y: k256::ScalarBytes = k256::ScalarBytes::default();
     let mut x_bits: Vec<u8> = Vec::new();
     let mut y_bits: Vec<u8> = Vec::new();
-    let mut z_bits: Vec<u8> = Vec::new();
-    while i < len - 3 {
-        if count == 0 {
-            while (i < len - 3)
-                && (bytes[i] != b' ' || bytes[i + 1] != b':' || bytes[i + 2] != b' ')
-            {
-                x_bits.push(bytes[i]);
-                i += 1;
-            }
-            count += 1;
-            i += 3;
-        }
-        if count == 1 {
-            while (i < len - 3)
-                && (bytes[i] != b' ' || bytes[i + 1] != b':' || bytes[i + 2] != b' ')
-            {
-                y_bits.push(bytes[i]);
-                i += 1;
-            }
-            count += 1;
-            i += 3;
-        }
-        if count == 2 {
-            while i < len - 3 && bytes[i - 1] != b')' {
-                z_bits.push(bytes[i]);
-                i += 1;
-            }
-        } else {
-            break;
-        }
+    while (i < len) && (bytes[i] != b' ' || bytes[i + 1] != b':' || bytes[i + 2] != b' ') {
+        x_bits.push(bytes[i]);
+        i += 1;
     }
+    y_bits.extend_from_slice(&bytes[i + 3..len - 1]);
     match k256::ScalarBytes::try_from(x_bits.as_slice()) {
-        Err(e) => eprintln!("Erreur : {}", e),
+        Err(e) => eprintln!("Erreur1 : {}", e),
         Ok(a) => x = a,
     }
     match k256::ScalarBytes::try_from(y_bits.as_slice()) {
-        Err(e) => eprintln!("Erreur : {}", e),
+        Err(e) => eprintln!("Erreur2 : {}", e),
         Ok(a) => y = a,
     }
     let encoded_p = EncodedPoint::from_affine_coordinates(&x.into_bytes(), &y.into_bytes(), false);
@@ -399,8 +376,8 @@ pub fn bytes_to_list(bytes: &[u8]) -> Vec<ProjectivePoint> {
     let l = bytes.len();
     let mut i = 0;
     let mut old_i = 0;
-    while i < l - 3 {
-        while i < l - 3 && (bytes[i] != b' ' || bytes[i + 1] != b';' || bytes[i + 2] != b' ') {
+    while i < l {
+        while (i < l) && (bytes[i] != b' ' || bytes[i + 1] != b';' || bytes[i + 2] != b' ') {
             i += 1;
         }
         res.push(bytes_to_point(&bytes[old_i..i]));
@@ -415,8 +392,8 @@ pub fn bytes_to_list_scalar(bytes: &[u8]) -> Vec<Scalar> {
     let l = bytes.len();
     let mut i = 0;
     let mut old_i = 0;
-    while i < l - 3 {
-        while i < l && (bytes[i] != b' ' || bytes[i + 1] != b';' || bytes[i + 2] != b' ') {
+    while i < l {
+        while (i < l) && (bytes[i] != b' ' || bytes[i + 1] != b';' || bytes[i + 2] != b' ') {
             i += 1;
         }
         match ScalarBytes::try_from(&bytes[old_i..i]) {
@@ -435,8 +412,8 @@ pub fn bytes_to_mat(bytes: &[u8]) -> Vec<Vec<ProjectivePoint>> {
     let l = bytes.len();
     let mut i = 0;
     let mut old_i = 0;
-    while i < l - 3 {
-        while i < l - 3 && (bytes[i] != b' ' || bytes[i + 1] != b'\n' || bytes[i + 2] != b' ') {
+    while i < l {
+        while (i < l) && (bytes[i] != b' ' || bytes[i + 1] != b'\n' || bytes[i + 2] != b' ') {
             i += 1;
         }
         res.push(bytes_to_list(&bytes[old_i..i]));
@@ -485,7 +462,6 @@ pub fn connect_and_send(bytes: &[u8]) {
         Ok(mut stream) => {
             println!("Connecté");
             if let Err(error) = stream.write(bytes) {
-                //write!(stream, "{}\n", b"test")
                 eprintln!("error: {}", error);
             };
             if let Err(error) = stream.flush() {
