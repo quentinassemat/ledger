@@ -7,7 +7,6 @@ use k256::{AffinePoint, EncodedPoint, ProjectivePoint, Scalar, ScalarBytes};
 use std::convert::TryFrom;
 use std::io::{stdin, Read, Write};
 use std::net::TcpStream;
-use std::ops::{Add, Mul};
 
 use crypto::digest::Digest;
 use crypto::sha2::Sha256;
@@ -18,7 +17,7 @@ pub const ADRESSE: &str = "localhost";
 pub const PORT: u16 = 1234;
 
 pub const NB_NONCES: u32 = 3;
-pub const NB_PARTICIPANT: u32 = 6;
+pub const NB_PARTICIPANT: u32 = 3;
 pub const MEM: usize = 16496;
 
 pub const M: &str = "Alice donne 1 Bitcoin à Bob";
@@ -50,9 +49,8 @@ pub struct Signer {
 impl Signer {
     // constructeur
     pub fn new() -> Signer {
-        let gen = ProjectivePoint::generator();
         let secret_key = Scalar::generate_biased(rand::thread_rng()); // ou generate_vartime ? mais side channels ?
-        let public_key = gen.mul(secret_key);
+        let public_key = ProjectivePoint::generator() * secret_key;
         let secret_list_r: Vec<Scalar> = Vec::new();
         let public_nonces: Vec<ProjectivePoint> = Vec::new();
         let pubkeys: Vec<ProjectivePoint> = Vec::new();
@@ -89,11 +87,13 @@ impl Signer {
     //fonction de génération des nonces privées
     pub fn gen_r(&mut self) {
         self.secret_list_r.clear();
-        for _i in 0..NB_NONCES {
+        for i in 0..NB_NONCES {
             self.secret_list_r
                 .push(Scalar::generate_biased(rand::thread_rng()));
+            // self.secret_list_r
+            //     .push(Scalar::from(1_u32));
             self.public_nonces
-                .push(ProjectivePoint::generator().mul(self.secret_key));
+                .push(ProjectivePoint::generator() * self.secret_list_r[i as usize]);
         }
     }
 
@@ -138,7 +138,7 @@ impl Signer {
     pub fn xtilde(&self) -> ProjectivePoint {
         let mut xtilde = ProjectivePoint::identity();
         for i in 0..NB_PARTICIPANT {
-            xtilde = xtilde.add(self.pubkeys[i as usize].mul(self.a[i as usize]));
+            xtilde = xtilde + (self.pubkeys[i as usize] * self.a[i as usize]);
         }
         xtilde
     }
@@ -149,7 +149,7 @@ impl Signer {
         for j in 0..NB_NONCES {
             let mut temp = ProjectivePoint::identity();
             for i in 0..NB_PARTICIPANT {
-                temp = temp.add(self.nonces[i as usize][j as usize]);
+                temp = temp + self.nonces[i as usize][j as usize];
             }
             r_nonces.push(temp);
         }
@@ -159,7 +159,7 @@ impl Signer {
     //fonction de calcul de b :
     pub fn b(&self) -> Vec<Scalar> {
         let mut b: Vec<Scalar> = Vec::new();
-        b.push(Scalar::from(1_u32));
+        b.push(Scalar::one());
         for j in 1..NB_NONCES {
             let mut hash = Sha256::new();
 
@@ -208,7 +208,7 @@ impl Signer {
         hash.input(bytes.as_slice());
         let mut b: [u8; 32] = [0; 32];
         hash.result(&mut b);
-        let mut c = Scalar::from(0_u32);
+        let mut c = Scalar::zero();
         match ScalarBytes::try_from(&b[..]) {
             Ok(b_scal) => match Scalar::from_repr(b_scal.into_bytes()) {
                 Some(x) => c = x,
@@ -221,20 +221,42 @@ impl Signer {
 
     //fonction de calcul de sign :
     pub fn selfsign(&self) -> Scalar {
-        let mut temp = Scalar::from(0_u32);
+        let mut temp = Scalar::zero();
         for j in 0..NB_NONCES {
             temp = temp + (self.secret_list_r[j as usize] * self.b[j as usize]);
         }
         (self.c * self.selfa * self.secret_key) + temp
     }
 
-    //fonction de vérif :
-    pub fn verif(&self) -> bool {
-        let mut signature = Scalar::from(0_u32);
+    pub fn signature(&self) -> Scalar {
+        // println!("on va afficher tout les paramètres pour voir s'il y a un truc qui va pas");
+        // println!("public_key : {:?}", AffinePoint::from(self.public_key));
+        // println!("public_nonces : {:?}", self.public_nonces);
+        // println!("pubkeys : {:?}", self.pubkeys);
+        // println!("nonces : {:?}", self.nonces);
+        // println!("a: {:?}", self.a);
+        // println!("selfa : {:?}", self.selfa);
+        // println!("xtilde : {:?}", self.xtilde);
+        // println!("r_nonces : {:?}", self.r_nonces);
+        // println!("b : {:?}", self.b);
+        // println!("rsign : {:?}", self.rsign);
+        // println!("c : {:?}", self.c);
+        // println!("selfsign : {:?}", self.selfsign);
+        // println!("sign : {:?}", self.sign);
+        // println!("secret_key : {:?}", self.secret_key);
+        // println!("secret_list_r : {:?}", self.secret_list_r);
+        let mut signature = Scalar::zero();
         for i in 0..NB_PARTICIPANT {
             signature = signature + self.sign[i as usize];
         }
-        ProjectivePoint::generator() * signature == self.rsign + (self.xtilde * self.c)
+        println!("signature : {:?}", signature);
+        signature
+    }
+
+    //fonction de vérif :
+    pub fn verif(&self) -> bool {
+        let signature = self.signature();
+        AffinePoint::from( ProjectivePoint::generator() * signature ) == AffinePoint::from(self.rsign + (self.xtilde * self.c))
     }
 }
 
@@ -298,7 +320,8 @@ pub fn point_to_bytes(p: ProjectivePoint) -> Vec<u8> {
     let deuxpoints = " : ".as_bytes();
     let parend = ")".as_bytes();
     res.extend(par);
-    let encoded_p = k256::EncodedPoint::encode(p, false);
+    let affine_p = AffinePoint::from(p);
+    let encoded_p = EncodedPoint::encode(affine_p, false);
     if let Some(x) = encoded_p.x() {
         if let Some(y) = encoded_p.y() {
             res.append(&mut x.to_vec());

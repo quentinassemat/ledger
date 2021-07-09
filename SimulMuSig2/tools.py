@@ -17,6 +17,7 @@ from arithm.field import Field, FieldElement
 #pour la communication tcp
 import socket
 
+#pour les interactions utilisateurs
 import sys
 
 #on travaille avec secp256K1 : voici quelques constantes :
@@ -41,8 +42,7 @@ PORT = 1234
 MEM = 16496 #mémoire nécessaire pour communiquer les infos durant les étapes de communications
 
 #Paramètres pour la signature
-nb_participant = 6
-nb_corromp = 0
+nb_participant = 3
 nb_nonces = 3
 M = "Alice donne 1 Bitcoin à Bob"
 
@@ -82,15 +82,9 @@ def matPoint_to_bytes(R): #pour envoyer matrice de point
     m = len(R[0]) #censé être nb_nonces
     L = []
     for i in range(n-1):
-        for j in range(m - 1):
-            L.append(point_to_bytes(R[i][j]))
-            L.append(b' ; ')
-        L.append(point_to_bytes(R[i][m-1]))
+        L.append(listPoint_to_bytes(R[i]))
         L.append(b' \n ')
-    for j in range(m- 1):
-        L.append(point_to_bytes(R[n-1][j]))
-        L.append(b' ; ')
-    L.append(point_to_bytes(R[n-1][m-1]))
+    L.append(listPoint_to_bytes(R[n-1]))
     return b''.join(L)
 
 def bytes_to_matPoint(bytes):

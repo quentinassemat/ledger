@@ -143,8 +143,8 @@ for i in range(NB_SIMUL):
     for j in range(nb_nonces):
         temp += ((SimulSigners[i]).list_r[j] * b[i][j]) % n
     s[i] = (c[i]*A[i][i]*(SimulSigners[i]).key + temp) % n
-    # print(f"s{i}")
-    # print(s[i])
+    print(f"s{i}")
+    print(s[i])
 
 
 print(f"On a calculé les signatures partielles, Voulez vous continuez la signature ? (Envoies des signatures partielles)");
