@@ -17,7 +17,7 @@ pub const ADRESSE: &str = "localhost";
 pub const PORT: u16 = 1234;
 
 pub const NB_NONCES: u32 = 3;
-pub const NB_PARTICIPANT: u32 = 3;
+pub const NB_PARTICIPANT: u32 = 6;
 pub const MEM: usize = 16496;
 
 pub const M: &str = "Alice donne 1 Bitcoin à Bob";
@@ -87,6 +87,7 @@ impl Signer {
     //fonction de génération des nonces privées
     pub fn gen_r(&mut self) {
         self.secret_list_r.clear();
+        self.public_nonces.clear();
         for i in 0..NB_NONCES {
             self.secret_list_r
                 .push(Scalar::generate_biased(rand::thread_rng()));
@@ -229,22 +230,6 @@ impl Signer {
     }
 
     pub fn signature(&self) -> Scalar {
-        // println!("on va afficher tout les paramètres pour voir s'il y a un truc qui va pas");
-        // println!("public_key : {:?}", AffinePoint::from(self.public_key));
-        // println!("public_nonces : {:?}", self.public_nonces);
-        // println!("pubkeys : {:?}", self.pubkeys);
-        // println!("nonces : {:?}", self.nonces);
-        // println!("a: {:?}", self.a);
-        // println!("selfa : {:?}", self.selfa);
-        // println!("xtilde : {:?}", self.xtilde);
-        // println!("r_nonces : {:?}", self.r_nonces);
-        // println!("b : {:?}", self.b);
-        // println!("rsign : {:?}", self.rsign);
-        // println!("c : {:?}", self.c);
-        // println!("selfsign : {:?}", self.selfsign);
-        // println!("sign : {:?}", self.sign);
-        // println!("secret_key : {:?}", self.secret_key);
-        // println!("secret_list_r : {:?}", self.secret_list_r);
         let mut signature = Scalar::zero();
         for i in 0..NB_PARTICIPANT {
             signature = signature + self.sign[i as usize];
@@ -256,7 +241,28 @@ impl Signer {
     //fonction de vérif :
     pub fn verif(&self) -> bool {
         let signature = self.signature();
-        AffinePoint::from( ProjectivePoint::generator() * signature ) == AffinePoint::from(self.rsign + (self.xtilde * self.c))
+        AffinePoint::from(ProjectivePoint::generator() * signature)
+            == AffinePoint::from(self.rsign + (self.xtilde * self.c))
+    }
+
+    //fonction de debug
+    pub fn affich(&self) {
+        println!("on va afficher tout les paramètres pour voir s'il y a un truc qui va pas");
+        println!("public_key : {:?}", AffinePoint::from(self.public_key));
+        println!("public_nonces : {:?}", self.public_nonces);
+        println!("pubkeys : {:?}", self.pubkeys);
+        println!("nonces : {:?}", self.nonces);
+        println!("a: {:?}", self.a);
+        println!("selfa : {:?}", self.selfa);
+        println!("xtilde : {:?}", self.xtilde);
+        println!("r_nonces : {:?}", self.r_nonces);
+        println!("b : {:?}", self.b);
+        println!("rsign : {:?}", self.rsign);
+        println!("c : {:?}", self.c);
+        println!("selfsign : {:?}", self.selfsign);
+        println!("sign : {:?}", self.sign);
+        println!("secret_key : {:?}", self.secret_key);
+        println!("secret_list_r : {:?}", self.secret_list_r);
     }
 }
 

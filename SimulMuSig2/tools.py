@@ -42,7 +42,7 @@ PORT = 1234
 MEM = 16496 #mémoire nécessaire pour communiquer les infos durant les étapes de communications
 
 #Paramètres pour la signature
-nb_participant = 3
+nb_participant = 6
 nb_nonces = 3
 M = "Alice donne 1 Bitcoin à Bob"
 
@@ -53,6 +53,7 @@ class Signer:
         self.key = sct.randbelow(n - 1) + 1
         self.KEY = self.key * G
         self.list_r = [0]*nb_nonces
+        self.selfa = 0
 
     def gen_r(self):
         for i in range(len(self.list_r)):
@@ -76,6 +77,12 @@ def bytesrep_to_messagePoint(bytesrep):
     str_id = bytesrep_list[0][5:]
     str_point = bytesrep_list[1]
     return messagePoint(bytes_to_point(str_id),bytes_to_point(str_point))
+
+def bytesrep_to_messageSign(bytesrep):
+    bytesrep_list = bytesrep.split(b' ] ')
+    str_id = bytesrep_list[0][5:]
+    str_sign = bytesrep_list[1]
+    return messagePoint(bytes_to_point(str_id),int.from_bytes(str_sign, 'big'))
 
 def matPoint_to_bytes(R): #pour envoyer matrice de point 
     n = len(R) #censé être nb_participant

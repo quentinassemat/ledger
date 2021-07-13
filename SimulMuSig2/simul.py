@@ -1,9 +1,9 @@
-#CE PYTHON SIMULE N-1 SIGNEURS AVEC UN NOMBRE DÉFINI DE SIGNEUR DE CONFIANCE 
+#CE PYTHON SIMULE NB_SIMUL SIGNEURS parmi nb_participant signeur (les autres étant en rust)
 
 #pour pouvoir utiliser les objets de tools.py comme un #include "lib.h"
 from tools import *
 
-NB_SIMUL = nb_participant - 1
+NB_SIMUL = nb_participant - 2
 
 SimulSigners = [Signer(nb_nonces) for i in range(NB_SIMUL)]
 
@@ -98,14 +98,20 @@ for k in range(NB_SIMUL):
     A.append([(int.from_bytes(hl.sha256(b''.join([(PUBKEYS[k][l].x.val).to_bytes(N_bytes, 'big') for l in range(
     nb_participant)] + [(PUBKEYS[k][i].x.val).to_bytes(N_bytes, 'big')])).digest(), 'big') % n) for i in range(nb_participant)])
 
+for k in range(NB_SIMUL):
+    for i in range(nb_participant):
+        if (PUBKEYS[k][i] == SimulSigners[k].KEY):
+            SimulSigners[k].selfa = int.from_bytes(hl.sha256(b''.join([(PUBKEYS[k][l].x.val).to_bytes(N_bytes, 'big') for l in range(
+    nb_participant)] + [(PUBKEYS[k][i].x.val).to_bytes(N_bytes, 'big')])).digest(), 'big') % n
+
 Xtildes = [E] * NB_SIMUL
 for l in range(NB_SIMUL):
     for i in range(nb_participant):
         Xtildes[l] = Xtildes[l].complete_add_unsafe(A[l][i] * PUBKEYS[l][i])
         Xtildes[l] = Xtildes[l].to_affine()
 
-# print("Xtilde")
-# print(Xtildes[0])
+print("Xtilde")
+print(Xtildes[0])
 
 #on calcule les Rj pour j entre 1 et v
 Rn = [[E]*nb_nonces for i in range(NB_SIMUL) ] #encore une fois on simule qu'il y a nb_participant signeurs indépendants
@@ -129,9 +135,6 @@ for l in range(NB_SIMUL):
         Rsign[l] = Rsign[l].complete_add_unsafe(b[l][j] * Rn[l][j])
     Rsign[l] = Rsign[l].to_affine()
 
-# print("Rsign")
-# print(Rsign[0])
-
 #on calcule c
 c = [int.from_bytes(hl.sha256(b''.join([(Xtildes[l].x.val).to_bytes(N_bytes, 'big'), (Rsign[l].x.val).to_bytes(N_bytes, 'big'), bytearray(M, 'utf-8')])).digest(), 'big') % n for l in range(NB_SIMUL)]
 
@@ -142,7 +145,7 @@ for i in range(NB_SIMUL):
     temp = 0
     for j in range(nb_nonces):
         temp += ((SimulSigners[i]).list_r[j] * b[i][j]) % n
-    s[i] = (c[i]*A[i][i]*(SimulSigners[i]).key + temp) % n
+    s[i] = (c[i]*SimulSigners[i].selfa*(SimulSigners[i]).key + temp) % n
     print(f"s{i}")
     print(s[i])
 

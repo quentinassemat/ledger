@@ -29,6 +29,7 @@ fn main() {
 
     //génération nonces privés
     s.gen_r();
+
     for i in 0..clientrust::NB_NONCES {
         let mes = clientrust::MessagePoint::new(s.public_key, s.public_nonces[i as usize]);
         let bytes_vec = mes.to_bytes();
