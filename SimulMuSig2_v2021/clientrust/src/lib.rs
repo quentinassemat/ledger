@@ -1,5 +1,3 @@
-#![warn(clippy::many_single_char_names)]
-
 use k256::elliptic_curve::group::ff::PrimeField;
 use k256::elliptic_curve::sec1::FromEncodedPoint;
 use k256::{AffinePoint, EncodedPoint, ProjectivePoint, Scalar, ScalarBytes};
@@ -17,7 +15,7 @@ pub const ADRESSE: &str = "localhost";
 pub const PORT: u16 = 1234;
 
 pub const NB_NONCES: u32 = 3;
-pub const NB_PARTICIPANT: u32 = 6;
+pub const NB_PARTICIPANT: u32 = 1;
 pub const MEM: usize = 16496;
 
 pub const M: &str = "Alice donne 1 Bitcoin à Bob";
@@ -35,7 +33,7 @@ pub struct Signer {
     pub selfa: Scalar,
     pub xtilde: ProjectivePoint,
     pub r_nonces: Vec<ProjectivePoint>,
-    pub b: Vec<Scalar>,
+    pub b: Scalar,
     pub rsign: ProjectivePoint,
     pub c: Scalar,
     pub selfsign: Scalar,
@@ -59,7 +57,7 @@ impl Signer {
         let selfa = Scalar::default();
         let xtilde = ProjectivePoint::default();
         let r_nonces: Vec<ProjectivePoint> = Vec::new();
-        let b: Vec<Scalar> = Vec::new();
+        let b: Scalar = Scalar::default();
         let rsign = ProjectivePoint::default();
         let c = Scalar::default();
         let selfsign = Scalar::default();
@@ -158,34 +156,30 @@ impl Signer {
     }
 
     //fonction de calcul de b :
-    pub fn b(&self) -> Vec<Scalar> {
-        let mut b: Vec<Scalar> = Vec::new();
-        b.push(Scalar::one());
-        for j in 1..NB_NONCES {
-            let mut hash = Sha256::new();
+    pub fn b(&self) -> Scalar {
+        let mut b = Scalar::one();
+        let mut hash = Sha256::new();
 
-            //on construit les bytes qui servent pour le hash
-            let mut bytes: Vec<u8> = Vec::new();
-            bytes.extend(j.to_be_bytes());
-            bytes.extend(point_to_bytes_4hash(self.xtilde));
-            for l in 0..NB_NONCES {
-                bytes.extend(point_to_bytes_4hash(self.r_nonces[l as usize]));
-            }
-            bytes.extend(M.bytes());
+        //on construit les bytes qui servent pour le hash
+        let mut bytes: Vec<u8> = Vec::new();
+        bytes.extend(point_to_bytes_4hash(self.xtilde));
+        for j in 0..NB_NONCES {
+            bytes.extend(point_to_bytes_4hash(self.r_nonces[j as usize]));
+        }
+        bytes.extend(M.bytes());
 
-            //on le met dans le hash
-            hash.input(bytes.as_slice());
-            let mut bi: [u8; 32] = [0; 32];
-            hash.result(&mut bi);
+        //on le met dans le hash
+        hash.input(bytes.as_slice());
+        let mut bi: [u8; 32] = [0; 32];
+        hash.result(&mut bi);
 
-            //On construit le Scalar qui corrrespond
-            match ScalarBytes::try_from(&bi[..]) {
-                Ok(bi_scal) => match Scalar::from_repr(bi_scal.into_bytes()) {
-                    Some(x) => b.push(x),
-                    None => eprintln!("Erreur "),
-                },
-                Err(e) => eprintln!("Erreur : {:?}", e),
-            }
+        //On construit le Scalar qui corrrespond
+        match ScalarBytes::try_from(&bi[..]) {
+            Ok(bi_scal) => match Scalar::from_repr(bi_scal.into_bytes()) {
+                Some(x) => b = x,
+                None => eprintln!("Erreur "),
+            },
+            Err(e) => eprintln!("Erreur : {:?}", e),
         }
         b
     }
@@ -193,8 +187,10 @@ impl Signer {
     //fonction de calcul de R:
     pub fn rsign(&self) -> ProjectivePoint {
         let mut rsign = ProjectivePoint::identity();
+        let mut temp_b = Scalar::one();
         for j in 0..NB_NONCES {
-            rsign = rsign + (self.r_nonces[j as usize] * self.b[j as usize]);
+            rsign = rsign + (self.r_nonces[j as usize] * (temp_b));
+            temp_b = temp_b * self.b;
         }
         rsign
     }
@@ -223,8 +219,10 @@ impl Signer {
     //fonction de calcul de sign :
     pub fn selfsign(&self) -> Scalar {
         let mut temp = Scalar::zero();
+        let mut temp_b = Scalar::one();
         for j in 0..NB_NONCES {
-            temp = temp + (self.secret_list_r[j as usize] * self.b[j as usize]);
+            temp = temp + (self.secret_list_r[j as usize] * temp_b);
+            temp_b = temp_b * self.b;
         }
         (self.c * self.selfa * self.secret_key) + temp
     }
@@ -346,22 +344,6 @@ pub fn point_to_bytes(p: ProjectivePoint) -> Vec<u8> {
     res
 }
 
-pub fn point_to_bytes_4hash(p: ProjectivePoint) -> Vec<u8> {
-    let mut res: Vec<u8> = Vec::new();
-    let a = AffinePoint::from(p);
-    let e = EncodedPoint::from(a);
-    match e.x() {
-        Some(y) => {
-            res.extend(y.iter());
-            res
-        }
-        None => {
-            eprintln!("Erreur de conversion");
-            res
-        }
-    }
-}
-
 pub fn bytes_to_point(bytes: &[u8]) -> ProjectivePoint {
     let len = bytes.len();
     let mut i = 1;
@@ -386,6 +368,22 @@ pub fn bytes_to_point(bytes: &[u8]) -> ProjectivePoint {
     match ProjectivePoint::from_encoded_point(&encoded_p) {
         Some(p) => p,
         None => ProjectivePoint::generator(),
+    }
+}
+
+pub fn point_to_bytes_4hash(p: ProjectivePoint) -> Vec<u8> {
+    let mut res: Vec<u8> = Vec::new();
+    let a = AffinePoint::from(p);
+    let e = EncodedPoint::from(a);
+    match e.x() {
+        Some(y) => {
+            res.extend(y.iter());
+            res
+        }
+        None => {
+            eprintln!("Erreur de conversion");
+            res
+        }
     }
 }
 
