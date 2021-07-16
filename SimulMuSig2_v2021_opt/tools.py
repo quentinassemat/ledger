@@ -83,20 +83,6 @@ def bytes_to_point(bytes_point : bytes):
     else:
         return Point(x,-y)
 
-# def point_to_bytes(p):
-#     res = bytearray(b"(")
-#     res.extend((p.x.val).to_bytes(N_bytes, 'big'))
-#     res.extend(b' : ')
-#     res.extend((p.y.val).to_bytes(N_bytes, 'big'))
-#     res.extend(b')')
-#     return bytes(res)
-
-# def bytes_to_point(bytes_point):
-#     temp = bytes_point[1:len(bytes_point)-1]
-#     list_temp = temp.split(b' : ')
-#     return Point(FieldElement(int.from_bytes(list_temp[0], 'big'), F), FieldElement(int.from_bytes(list_temp[1], 'big'), F))
-
-
 def bytesrep_to_messagePoint(bytesrep):
     bytesrep_list = bytesrep.split(b' ] ')
     str_id = bytesrep_list[0][5:]
