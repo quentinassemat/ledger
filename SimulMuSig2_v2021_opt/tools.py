@@ -42,7 +42,7 @@ PORT = 1234
 MEM = 16496 #mémoire nécessaire pour communiquer les infos durant les étapes de communications
 
 #Paramètres pour la signature
-nb_participant = 2
+nb_participant = 3
 nb_nonces = 3
 M = "Alice donne 1 Bitcoin à Bob"
 
@@ -61,13 +61,19 @@ class Signer:
 
 def point_to_bytes(p : Point):
     #d'après sec1
+    p.to_affine()
     res = bytearray()
-    res.extend(((p.y.val % 2) + 2).to_bytes(1, 'big'))
-    res.extend((p.x.val).to_bytes(N_bytes, 'big'))
+    if p.is_at_infinity():
+        res.extend(0).to_bytes(N_bytes + 1, 'big')
+    else :
+        res.extend(((p.y.val % 2) + 2).to_bytes(1, 'big'))
+        res.extend((p.x.val).to_bytes(N_bytes, 'big'))
     return bytes(res)
 
 def bytes_to_point(bytes_point : bytes):
     #d'après sec1
+    if (bytes == (0).to_bytes(N_bytes + 1, 'big')):
+        return E
     x = FieldElement(int.from_bytes(bytes_point[1:len(bytes_point)], 'big'), F)
     y_squared = x ** 3 + x * secp256k1.a + secp256k1.b
     y = FieldElement.sqrt(y_squared)
@@ -75,7 +81,7 @@ def bytes_to_point(bytes_point : bytes):
     if ytilde == y.val % 2:
         return Point(x,y)
     else:
-        return Point(x,F(n)-y)
+        return Point(x,-y)
 
 # def point_to_bytes(p):
 #     res = bytearray(b"(")

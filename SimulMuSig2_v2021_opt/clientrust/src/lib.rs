@@ -15,7 +15,7 @@ pub const ADRESSE: &str = "localhost";
 pub const PORT: u16 = 1234;
 
 pub const NB_NONCES: u32 = 3;
-pub const NB_PARTICIPANT: u32 = 2;
+pub const NB_PARTICIPANT: u32 = 3;
 pub const MEM: usize = 16496;
 
 pub const M: &str = "Alice donne 1 Bitcoin à Bob";

@@ -3,7 +3,7 @@
 #pour pouvoir utiliser les objets de tools.py comme un #include "lib.h"
 from tools import *
 
-NB_SIMUL = nb_participant
+NB_SIMUL = nb_participant - 1
 
 SimulSigners = [Signer(nb_nonces) for i in range(NB_SIMUL)]
 

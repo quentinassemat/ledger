@@ -14,10 +14,6 @@ PUBKEYS = []
 
 print("La socket est bind, nous pouvons commencer")
 
-# client, adresseClient = serveur.accept()
-# donnees = client.sendall(point_to_bytes(G))
-# client.close()
-
 while len(PUBKEYS) < nb_participant:
     try:
         client, adresseClient = serveur.accept()
@@ -107,7 +103,6 @@ while count_sign < nb_participant:
                 if PUBKEYS[i] == mes.id: 
                     S[i] = mes.sign % n
                     count_sign += 1
-                    print(f"s{i} : {mes.sign}")
             client.close()
     finally:
         client.close()
