@@ -1,13 +1,13 @@
 from ledgerblue.commTCP import getDongle as getDongleTCP
 from ledgerblue.comm import getDongle
 
-from random import getrandbits as rnd, randint
+from random import getrandbits as rnd, randbytes, randint
 from binascii import hexlify, unhexlify
 
 from time import sleep
 
-randint1 = 251
-randint2 = 253
+randint1 = int.from_bytes(randbytes(4), 'big') // 2
+randint2 = int.from_bytes(randbytes(4), 'big') // 2
 rand_msg1 = hexlify(randint1.to_bytes(4, 'big')).decode()
 rand_msg2 = hexlify(randint2.to_bytes(4, 'big')).decode()
 

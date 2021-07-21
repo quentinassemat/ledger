@@ -7,10 +7,9 @@ mod utils;
 use core::str::from_utf8;
 use crypto_helpers::*;
 use nanos_sdk::buttons::ButtonEvent;
-use nanos_sdk::ecc::DerEncodedEcdsaSignature;
 use nanos_sdk::io;
 // use nanos_sdk::bindings;
-use nanos_sdk::io::SyscallError;
+// use nanos_sdk::io::SyscallError;
 use nanos_ui::ui;
 
 nanos_sdk::set_panic!(nanos_sdk::exiting_panic);
@@ -91,7 +90,7 @@ extern "C" fn sample_main() {
         ui::SingleMessage::new("Welcome MuSig2").show();
         // Wait for either a specific button push to exit the app
         // or an APDU command
-        
+
         match comm.next_event() {
             io::Event::Button(ButtonEvent::RightButtonRelease) => nanos_sdk::exit_app(0),
             io::Event::Command(ins) => match handle_apdu(&mut comm, ins) {
@@ -142,35 +141,28 @@ fn handle_apdu(comm: &mut io::Comm, ins: Ins) -> Result<(), Reply> {
         Ins::ShowPrivateKey => comm.append(&bip32_derive_secp256k1(&BIP32_PATH)?),
         Ins::Exit => nanos_sdk::exit_app(0),
         Ins::RecInt => {
-            let mut temp :u8 = 0;
-            let len = 0 as usize; //u16::from_le_bytes([comm.apdu_buffer[2], comm.apdu_buffer[3]])
-            match comm.get_data() {
-                Ok(data) => {
-                    let mut int1_bytes : [u8 ; 4] = [0; 4];
-                    // int1_bytes[0] = data[0];
-                    // int1_bytes[1] = data[1];
-                    // int1_bytes[2] = data[2];
-                    // int1_bytes[3] = data[3];
-                    let mut int2_bytes : [u8 ; 4] = [0; 4]; 
-                    // int2_bytes[0] = data[4];
-                    // int2_bytes[1] = data[5];
-                    // int2_bytes[2] = data[6];
-                    // int2_bytes[3] = data[7];
-                    let mut sum = u32::from_be_bytes(int1_bytes) + u32::from_be_bytes(int2_bytes);
-                    // sum = nbr_bytes as u32;
-                    {
-                        let m = from_utf8(&int1_bytes).unwrap();
-                        ui::MessageScroller::new(m).event_loop();
-                    }
-                    {
-                        let m = from_utf8(&int2_bytes).unwrap();
-                        ui::MessageScroller::new(m).event_loop();
-                    }
-                    comm.append(&len.to_be_bytes());
-
-                }
-                _ => return Err(io::StatusWords::BadLen.into()),
+            let mut int1_bytes: [u8; 4] = [0; 4];
+            int1_bytes[0] = comm.apdu_buffer[4];
+            int1_bytes[1] = comm.apdu_buffer[5];
+            int1_bytes[2] = comm.apdu_buffer[6];
+            int1_bytes[3] = comm.apdu_buffer[7];
+            {
+                let hex0 = utils::to_hex(&comm.apdu_buffer[4..8]).unwrap();
+                let m = from_utf8(&hex0).unwrap();
+                ui::popup(m);
             }
+            let mut int2_bytes: [u8; 4] = [0; 4];
+            int2_bytes[0] = comm.apdu_buffer[8];
+            int2_bytes[1] = comm.apdu_buffer[9];
+            int2_bytes[2] = comm.apdu_buffer[10];
+            int2_bytes[3] = comm.apdu_buffer[11];
+            {
+                let hex0 = utils::to_hex(&comm.apdu_buffer[8..12]).unwrap();
+                let m = from_utf8(&hex0).unwrap();
+                ui::popup(m);
+            }
+            let sum = u32::from_be_bytes(int1_bytes) + u32::from_be_bytes(int2_bytes);
+            comm.append(&sum.to_be_bytes());
         }
     }
     Ok(())

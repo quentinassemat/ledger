@@ -1,5 +1,5 @@
-use nanos_sdk::bindings::*;
-use nanos_sdk::ecc::{CurvesId, DerEncodedEcdsaSignature};
+// use nanos_sdk::bindings::*;
+use nanos_sdk::ecc::CurvesId;
 use nanos_sdk::io::SyscallError;
 
 pub const BIP32_PATH: [u32; 5] = nanos_sdk::ecc::make_bip32_path(b"m/44'/535348'/0'/0/0");
