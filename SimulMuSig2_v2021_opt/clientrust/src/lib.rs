@@ -1,6 +1,6 @@
 use k256::elliptic_curve::group::ff::PrimeField;
 use k256::elliptic_curve::sec1::FromEncodedPoint;
-use k256::{AffinePoint, EncodedPoint, ProjectivePoint, Scalar, ScalarBytes, CompressedPoint};
+use k256::{AffinePoint, EncodedPoint, ProjectivePoint, Scalar, ScalarBytes};
 
 use std::convert::TryFrom;
 use std::io::{stdin, Read, Write};

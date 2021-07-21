@@ -1,6 +1,6 @@
 //Protocole de signature MuSig2 v2021, avec les conversion bytes SEC1, en limitant les paquets à 256 bits
 
-use k256::{ProjectivePoint, AffinePoint, Scalar};
+use k256::{AffinePoint};
 
 fn main() {
     let mut s = clientrust::Signer::new();
