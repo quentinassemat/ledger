@@ -6,13 +6,13 @@ from binascii import hexlify, unhexlify
 
 from time import sleep
 
-randint1 = randint(0, 304983)
-randint2 = randint(0, 304983)
+randint1 = 251
+randint2 = 253
 rand_msg1 = hexlify(randint1.to_bytes(4, 'big')).decode()
 rand_msg2 = hexlify(randint2.to_bytes(4, 'big')).decode()
 
 CMDS = [
-    "8003"+"2000" + rand_msg1 + rand_msg2,
+    "8003"+"0002" + rand_msg1 + rand_msg2,
 ]
 
 print(CMDS[0])
@@ -27,7 +27,7 @@ for cmd in map(unhexlify, CMDS):
     print(cmd)
     r = None
     try:
-        r = d.exchange(cmd, 20)
+        r = d.exchange(cmd)
         sleep(1)
     except Exception as e:
         print("test")
@@ -37,4 +37,5 @@ for cmd in map(unhexlify, CMDS):
         ANSWER.append(int.from_bytes(r, 'big'))
         count += 1
 
-print(f"On obtient le résultat suivant : {ANSWER[0]}")
+print(f"On obtient le résultat suivant : {ANSWER}")
+d.close()
