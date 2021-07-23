@@ -178,10 +178,10 @@ fn handle_apdu(comm: &mut io::Comm, ins: Ins) -> Result<(), Reply> {
                 let mut point1 = 0_u32;
                 let mut point2 = 0_u32;
 
+                {
                 let mut p1_bytes: [u8; N_BYTES as usize] = [0; N_BYTES as usize];
                 let ptr_p1_bytes: *const u8 = p1_bytes.as_ptr();
 
-                {
                     for i in 0..N_BYTES {
                         p1_bytes[i as usize] = comm.apdu_buffer[4_usize + i as usize];
                     }
@@ -258,26 +258,28 @@ fn handle_apdu(comm: &mut io::Comm, ins: Ins) -> Result<(), Reply> {
             }
             unsafe {
                 bindings::cx_bn_lock(N_BYTES, 0);
-                let test = bindings::cx_bn_export(point_sum, sum_bytes_ptr, N_BYTES);
 
-                {
-                    // debug
-                    let hex0 = utils::to_hex(&u32::to_be_bytes(test as u32)).unwrap();
-                    let m = from_utf8(&hex0).unwrap();
-                    ui::popup(m);
-                }
+                // debug
+                // let test = bindings::cx_bn_export(point_sum, sum_bytes_ptr, N_BYTES);
 
-                // match bindings::cx_bn_export(point_sum, sum_bytes_ptr, N_BYTES) {
-                //     bindings::CX_OK => {
-                //         ui::popup("Success export");
-                //     }
-                //     bindings::CX_INVALID_PARAMETER_VALUE => ui::popup("invalid value"),
-                //     bindings::CX_INVALID_PARAMETER_SIZE => ui::popup("Invalid size"),
-                //     bindings::CX_INVALID_PARAMETER => ui::popup("Invalid param"),
-                //     _ => {
-                //         ui::popup("Erreur inc export");
-                //     }
+                // {
+                //     let hex0 = utils::to_hex(&u32::to_be_bytes(test as u32)).unwrap();
+                //     let m = from_utf8(&hex0).unwrap();
+                //     ui::popup(m);
                 // }
+
+                match bindings::cx_bn_export(point_sum, sum_bytes_ptr, N_BYTES) {
+                    bindings::CX_OK => {
+                        ui::popup("Success export");
+                    }
+                    bindings::CX_INVALID_PARAMETER_VALUE => ui::popup("invalid value"),
+                    bindings::CX_INVALID_PARAMETER_SIZE => ui::popup("Invalid size"),
+                    bindings::CX_INVALID_PARAMETER => ui::popup("Invalid param"),
+                    bindings::CX_MEMORY_FULL => ui::popup("Mem full"),
+                    _ => {
+                        ui::popup("Erreur inc export");
+                    }
+                }
                 bindings::cx_bn_unlock();
             }
             comm.append(&sum_bytes)
