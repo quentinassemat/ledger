@@ -6,11 +6,13 @@ mod utils;
 
 use core::str::from_utf8;
 use crypto_helpers::*;
+use nanos_sdk::bindings;
 use nanos_sdk::buttons::ButtonEvent;
 use nanos_sdk::io;
-// use nanos_sdk::bindings;
 // use nanos_sdk::io::SyscallError;
 use nanos_ui::ui;
+
+pub const N_BYTES: u32 = 32;
 
 nanos_sdk::set_panic!(nanos_sdk::exiting_panic);
 
@@ -109,6 +111,7 @@ extern "C" fn sample_main() {
 enum Ins {
     GetPubkey,
     RecInt,
+    RecField,
     Menu,
     ShowPrivateKey,
     Exit,
@@ -120,6 +123,7 @@ impl From<u8> for Ins {
             1 => Ins::GetPubkey,
             2 => Ins::Menu,
             3 => Ins::RecInt,
+            4 => Ins::RecField,
             0xfe => Ins::ShowPrivateKey,
             0xff => Ins::Exit,
             _ => panic!(),
@@ -163,6 +167,120 @@ fn handle_apdu(comm: &mut io::Comm, ins: Ins) -> Result<(), Reply> {
             }
             let sum = u32::from_be_bytes(int1_bytes) + u32::from_be_bytes(int2_bytes);
             comm.append(&sum.to_be_bytes());
+        }
+        Ins::RecField => {
+            // déclaration
+            let mut point_sum = 0_u32;
+            let mut sum_bytes: [u8; N_BYTES as usize] = [0; N_BYTES as usize];
+            let sum_bytes_ptr: *mut u8 = sum_bytes.as_mut_ptr();
+
+            {
+                let mut point1 = 0_u32;
+                let mut point2 = 0_u32;
+
+                let mut p1_bytes: [u8; N_BYTES as usize] = [0; N_BYTES as usize];
+                let ptr_p1_bytes: *const u8 = p1_bytes.as_ptr();
+
+                {
+                    for i in 0..N_BYTES {
+                        p1_bytes[i as usize] = comm.apdu_buffer[4_usize + i as usize];
+                    }
+                    unsafe {
+                        bindings::cx_bn_lock(N_BYTES, 0);
+                        match bindings::cx_bn_alloc_init(
+                            &mut point1,
+                            N_BYTES,
+                            ptr_p1_bytes,
+                            N_BYTES,
+                        ) {
+                            bindings::CX_OK => {
+                                ui::popup("Success alloc");
+                            }
+                            bindings::CX_MEMORY_FULL => ui::popup("Memory full"),
+                            bindings::CX_INVALID_PARAMETER_SIZE => ui::popup("Invalid size"),
+                            _ => {
+                                ui::popup("Erreur inconnue");
+                            }
+                        }
+                        bindings::cx_bn_unlock();
+                    }
+                }
+
+                {
+                    let mut p2_bytes: [u8; N_BYTES as usize] = [0; N_BYTES as usize];
+                    let ptr_p2_bytes: *const u8 = p2_bytes.as_ptr();
+
+                    for i in 0..N_BYTES {
+                        p2_bytes[i as usize] =
+                            comm.apdu_buffer[4_usize + i as usize + N_BYTES as usize];
+                    }
+                    unsafe {
+                        bindings::cx_bn_lock(N_BYTES, 0);
+                        match bindings::cx_bn_alloc_init(
+                            &mut point2,
+                            N_BYTES,
+                            ptr_p2_bytes,
+                            N_BYTES,
+                        ) {
+                            bindings::CX_OK => {
+                                ui::popup("Success alloc");
+                            }
+                            bindings::CX_MEMORY_FULL => ui::popup("Memory full"),
+                            bindings::CX_INVALID_PARAMETER_SIZE => ui::popup("Invalid size"),
+                            _ => {
+                                ui::popup("Erreur inconnue");
+                            }
+                        }
+                        bindings::cx_bn_unlock();
+                    }
+                }
+
+                // on a récupéré la valeur des deux points. On crée maintenant le point qui vaut la somme
+                unsafe {
+                    bindings::cx_bn_lock(N_BYTES, 0);
+                    match bindings::cx_bn_alloc(&mut point_sum, N_BYTES) {
+                        bindings::CX_OK => {
+                            ui::popup("Success alloc");
+                        }
+                        bindings::CX_MEMORY_FULL => ui::popup("Memory full"),
+                        bindings::CX_INVALID_PARAMETER_SIZE => ui::popup("Invalid size"),
+                        _ => {
+                            ui::popup("Erreur inconnue");
+                        }
+                    }
+                }
+                let copy_p1 = point1;
+                let copy_p2 = point2;
+                unsafe {
+                    bindings::cx_bn_add(point_sum, copy_p1, copy_p2);
+                    bindings::cx_bn_unlock();
+                }
+            }
+            unsafe {
+                bindings::cx_bn_lock(N_BYTES, 0);
+                let test = bindings::cx_bn_export(point_sum, sum_bytes_ptr, N_BYTES);
+
+                {
+                    // debug
+                    let hex0 = utils::to_hex(&u32::to_be_bytes(test as u32)).unwrap();
+                    let m = from_utf8(&hex0).unwrap();
+                    ui::popup(m);
+                }
+
+                // match bindings::cx_bn_export(point_sum, sum_bytes_ptr, N_BYTES) {
+                //     bindings::CX_OK => {
+                //         ui::popup("Success export");
+                //     }
+                //     bindings::CX_INVALID_PARAMETER_VALUE => ui::popup("invalid value"),
+                //     bindings::CX_INVALID_PARAMETER_SIZE => ui::popup("Invalid size"),
+                //     bindings::CX_INVALID_PARAMETER => ui::popup("Invalid param"),
+                //     _ => {
+                //         ui::popup("Erreur inc export");
+                //     }
+                // }
+                bindings::cx_bn_unlock();
+            }
+            comm.append(&sum_bytes)
         }
     }
     Ok(())
