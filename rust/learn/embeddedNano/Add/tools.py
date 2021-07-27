@@ -59,29 +59,50 @@ class Signer:
         for i in range(len(self.list_r)):
             self.list_r[i] = sct.randbelow(n)
 
-def point_to_bytes(p : Point):
+def point_to_bytes(p : Point, compress = False): # TODO : on pourrait checker le premier bit et choisir si c'est compressé en fonction
     #d'après sec1
-    p.to_affine()
-    res = bytearray()
-    if p.is_at_infinity():
-        res.extend(0).to_bytes(N_bytes + 1, 'big')
-    else :
-        res.extend(((p.y.val % 2) + 2).to_bytes(1, 'big'))
-        res.extend((p.x.val).to_bytes(N_bytes, 'big'))
-    return bytes(res)
-
-def bytes_to_point(bytes_point : bytes):
-    #d'après sec1
-    if (bytes == (0).to_bytes(N_bytes + 1, 'big')):
-        return E
-    x = FieldElement(int.from_bytes(bytes_point[1:len(bytes_point)], 'big'), F)
-    y_squared = x ** 3 + x * secp256k1.a + secp256k1.b
-    y = FieldElement.sqrt(y_squared)
-    ytilde = int.from_bytes(bytes_point[0:1], 'big') % 2
-    if ytilde == y.val % 2:
-        return Point(x,y)
+    if compress:
+        p.to_affine()
+        res = bytearray()
+        if p.is_at_infinity():
+            res.extend(0).to_bytes(N_bytes + 1, 'big')
+        else :
+            res.extend(((p.y.val % 2) + 2).to_bytes(1, 'big'))
+            res.extend((p.x.val).to_bytes(N_bytes, 'big'))
+        return bytes(res)
     else:
-        return Point(x,-y)
+        p.to_affine()
+        res = bytearray()
+        res.extend(((4).to_bytes(1, 'big')))
+        res.extend((p.x.val).to_bytes(N_bytes, 'big'))
+        res.extend((p.y.val).to_bytes(N_bytes, 'big'))   
+        return bytes(res)
+
+
+def bytes_to_point(bytes_point : bytes, compress = False):
+    #d'après sec1
+    if compress:
+        if (bytes == (0).to_bytes(N_bytes + 1, 'big')):
+            return E
+        x = FieldElement(int.from_bytes(bytes_point[1:len(bytes_point)], 'big'), F)
+        y_squared = x ** 3 + x * secp256k1.a + secp256k1.b
+        y = FieldElement.sqrt(y_squared)
+        ytilde = int.from_bytes(bytes_point[0:1], 'big') % 2
+        if ytilde == y.val % 2:
+            return Point(x,y)
+        else:
+            return Point(x,-y)
+    else :
+        valid = int.from_bytes(bytes_point[0:1], 'big')
+        if valid != 4:
+            raise Exception("Unvalid encoding")
+        else :
+            x = FieldElement(int.from_bytes(bytes_point[1:N_bytes + 1], 'big'), F)
+            y = FieldElement(int.from_bytes(bytes_point[N_bytes + 1:len(bytes_point)], 'big'), F)
+            if (y**2 == x ** 3 + x * secp256k1.a + secp256k1.b):
+                return Point(x,y)
+            raise Exception("Point pas sur la courbe")
+
 
 def bytesrep_to_messagePoint(bytesrep):
     bytesrep_list = bytesrep.split(b' ] ')
