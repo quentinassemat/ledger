@@ -29,23 +29,21 @@ l3 = hexlify((2 * (2 * N_bytes + 1)).to_bytes(2, 'little')).decode()
 print(l3)
 
 CMDS = [
-    # "8003"+ l1 + rand_msg1 + rand_msg2, # envoie de deux entier de type u32 
+    "8003"+ l1 + rand_msg1 + rand_msg2, # envoie de deux entier de type u32 
     "8004" + l2 + rand_msg3 + rand_msg4, # envoie deux field element
-    # "8005" + l3 + rand_msg5 + rand_msg6 # envoie deux point secp256k1
+    "8005" + l3 + rand_msg5 + rand_msg6 # envoie deux point secp256k1
 ]
-
-print(CMDS[0])
 
 d = getDongleTCP(port=40000)
 
-# print(
-#     f"Nous essayons de faire l'addition suivante {randint1} + {randint2} = {randint1 + randint2} ")
+print(
+    f"Nous essayons de faire l'addition suivante {randint1} + {randint2} = {randint1 + randint2} ")
 
 print(
-    f"Nous essayons de faire l'addition suivante {randfield1} + {randfield2} = {randfield1 + randfield2 % n} ")
+    f"Nous essayons de faire l'addition suivante {randfield1} + {randfield2} = {(randfield1 + randfield2 ) % n} ")
 
-# print(
-#     f"Nous essayons de faire l'addition suivante {randpoint1.to_affine()} + {randpoint2.to_affine()} = {(randpoint1 + randpoint2).to_affine()} ")
+print(
+    f"Nous essayons de faire l'addition suivante {randpoint1.to_affine()} + {randpoint2.to_affine()} = {(randpoint1 + randpoint2).to_affine()} ")
 
 ANSWER = []
 for i in range(len(CMDS)):
@@ -60,11 +58,11 @@ for i in range(len(CMDS)):
         print(e)
     if r is not None:
         # print("Response hex : ", hexlify(r))
-        ANSWER.append(bytes_to_point(r))
-        # if (i == len(CMDS) - 1):
-        #     ANSWER.append(bytes_to_point(r))
-        # else:
-        #     ANSWER.append(int.from_bytes(r, 'big') % n)
+        # ANSWER.append(int.from_bytes(r, 'big'))
+        if (i == len(CMDS) - 1):
+            ANSWER.append(bytes_to_point(r))
+        else:
+            ANSWER.append(int.from_bytes(r, 'big') % n)
     sleep(2)
 
 print(f"On obtient le résultat suivant : {ANSWER}")

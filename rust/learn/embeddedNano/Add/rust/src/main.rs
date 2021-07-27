@@ -82,9 +82,9 @@ extern "C" fn sample_main() {
     }
 }
 
-fn add_int(message: &[u8]) -> Result<[u8; 4], SyscallError> {
-    ui::popup("Add int ?"); // à modif avec ask
-
+fn add_int(message: &[u8]) -> Result<Option<[u8; 4]>, SyscallError> {
+    if ui::Validator::new("Add int ?").ask() 
+    {
     let mut int1_bytes: [u8; 4] = [0; 4];
     int1_bytes[0] = message[0];
     int1_bytes[1] = message[1];
@@ -111,13 +111,18 @@ fn add_int(message: &[u8]) -> Result<[u8; 4], SyscallError> {
         ui::popup(m);
     }
 
-    Ok((u32::from_be_bytes(int1_bytes) + u32::from_be_bytes(int2_bytes)).to_be_bytes())
+    Ok(Some((u32::from_be_bytes(int1_bytes) + u32::from_be_bytes(int2_bytes)).to_be_bytes()))
+    }
+    else {
+        ui::popup("Cancelled");
+        Ok(None)
+    }
 }
 
-fn add_field(message: &[u8]) -> Result<[u8; N_BYTES as usize], SyscallError> {
+fn add_field(message: &[u8]) -> Result<Option<[u8; N_BYTES as usize]>, SyscallError> {
     // on essaye d'optimiser la place sur la stack avec les {}
-    ui::popup("Add field ?"); // à modif avec ask
-
+    if ui::Validator::new("Add field ?").ask() 
+    {
     unsafe {
         match bindings::cx_bn_lock(N_BYTES, 0) {
             bindings::CX_OK => (),
@@ -129,6 +134,7 @@ fn add_field(message: &[u8]) -> Result<[u8; N_BYTES as usize], SyscallError> {
     let mut point_sum = 0_u32;
     let mut sum_bytes: [u8; N_BYTES as usize] = [0; N_BYTES as usize];
     let sum_bytes_ptr: *mut u8 = sum_bytes.as_mut_ptr();
+
 
     {
         let mut point1 = 0_u32;
@@ -188,7 +194,7 @@ fn add_field(message: &[u8]) -> Result<[u8; N_BYTES as usize], SyscallError> {
                 }
             }
         }
-
+    
         // allocation et initialisation de la valeur du modulo (order de secp256k1)
         {
             let mut mod_bytes: [u8; N_BYTES as usize] = [0; N_BYTES as usize]; // mod = FFFFFFFF FFFFFFFF FFFFFFFF FFFFFFFE BAAEDCE6 AF48A03B BFD25E8C D0364141
@@ -263,12 +269,17 @@ fn add_field(message: &[u8]) -> Result<[u8; N_BYTES as usize], SyscallError> {
             _ => return Err(SyscallError::Unspecified),
         }
     }
-    Ok(sum_bytes)
+    Ok(Some(sum_bytes))
+    }
+    else {
+        ui::popup("Cancelled");
+        Ok(None)
+    }
 }
 
-fn add_point(message: &[u8]) -> Result<[u8; 2 * N_BYTES as usize + 1 as usize], SyscallError> {
-    ui::popup("Add point ?"); // à modif avec ask
-
+fn add_point(message: &[u8]) -> Result<Option<[u8; 2 * N_BYTES as usize + 1 as usize]>, SyscallError> {
+    if ui::Validator::new("Add point ?").ask() 
+    {
     unsafe {
         match bindings::cx_bn_lock(N_BYTES, 0) {
             bindings::CX_OK => (),
@@ -401,7 +412,12 @@ fn add_point(message: &[u8]) -> Result<[u8; 2 * N_BYTES as usize + 1 as usize], 
             _ => return Err(SyscallError::Unspecified),
         }
     }
-    Ok(sum_bytes)
+    Ok(Some(sum_bytes))
+    }
+    else {
+        ui::popup("Cancelled");
+        Ok(None)
+    }
 }
 
 #[repr(u8)]
@@ -443,24 +459,21 @@ fn handle_apdu(comm: &mut io::Comm, ins: Ins) -> Result<(), Reply> {
         Ins::ShowPrivateKey => comm.append(&bip32_derive_secp256k1(&BIP32_PATH)?),
         Ins::Exit => nanos_sdk::exit_app(0),
         Ins::RecInt => {
-            let out = add_int(comm.get_data()?);
-            match out {
-                Ok(o) => comm.append(&o),
-                Err(e) => comm.reply(e),
+            let out = add_int(comm.get_data()?)?;
+            if let Some(o) = out {
+                comm.append(&o)
             }
         }
         Ins::RecField => {
-            let out = add_field(comm.get_data()?);
-            match out {
-                Ok(o) => comm.append(&o),
-                Err(e) => comm.reply(e),
+            let out = add_field(comm.get_data()?)?;
+            if let Some(o) = out {
+                comm.append(&o)
             }
         }
         Ins::RecPoint => {
-            let out = add_point(comm.get_data()?);
-            match out {
-                Ok(o) => comm.append(&o),
-                Err(e) => comm.reply(e),
+            let out = add_point(comm.get_data()?)?;
+            if let Some(o) = out {
+                comm.append(&o)
             }
         }
     }
